@@ -6,6 +6,7 @@ struct Display {
     Display(spi::Spi &spi) : spi(spi) {}
 
     void init() {
+        // Set CS deactive();
         // Reset
         // Reset
         //  - reset pin high

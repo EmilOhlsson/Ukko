@@ -11,10 +11,10 @@ int main() {
         .reset = Gpio::Output(Gpio::Active::Low, 17),
         .control = Gpio::Output(Gpio::Active::Low, 25),
         .select = Gpio::Output(Gpio::Active::Low, 8),
-        .busy = Gpio::Input(),
+        .busy = Gpio::Input(24),
     };
 
-    spi::Spi spi("foo/bar", control_pins);
+    spi::Spi spi("/dev/spidev0.0", control_pins);
     Display display(spi);
     display.init();
 
