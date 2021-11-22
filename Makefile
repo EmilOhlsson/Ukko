@@ -16,4 +16,4 @@ format:
 clean:
 	rm -f $(OBJS) ukko
 
--include: %.d
+-include: *.d
