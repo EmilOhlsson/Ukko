@@ -35,4 +35,3 @@ struct File {
   private:
     int fd;
 };
-

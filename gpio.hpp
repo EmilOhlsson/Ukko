@@ -43,9 +43,15 @@ struct Output {
 
     ActiveScope keep_active() { return ActiveScope(*this); }
 
-    void activate() { fmt::print("Activating {}\n", pin); }
+    void activate() {
+        fmt::print("Activating {}\n", pin);
+        write(*output, level == Active::Low ? "0" : "1", 1);
+    }
 
-    void deactive() { fmt::print("Deactivating {}\n", pin); }
+    void deactive() {
+        fmt::print("Deactivating {}\n", pin);
+        write(*output, level == Active::Low ? "1" : "0", 1);
+    }
 
   private:
     Active level;
@@ -68,15 +74,17 @@ struct Input {
     }
 
     void wfi() {
-        pollfd pfd {
+        // TODO this is not really done
+        pollfd pfd{
             .fd = *input,
             .events = POLLPRI,
+            .revents = {},
         };
         std::array<uint8_t, 8> buffer;
         lseek(*input, 0, SEEK_SET);
         ::read(*input, buffer.data(), buffer.size());
         poll(&pfd, 1, -1);
-        lseek(*input, 0, SEEK_SET);    /* consume interrupt */
+        lseek(*input, 0, SEEK_SET); /* consume interrupt */
         read(*input, buffer.data(), buffer.size());
     }
 
