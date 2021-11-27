@@ -2,6 +2,10 @@
 
 #include "hwif.hpp"
 
+template <typename T> constexpr T div_ceil(T n, T d) {
+    return (n + d - 1) / d;
+}
+
 struct Display {
     Display(hwif::hwif &hwif) : hwif(hwif) {}
 
@@ -75,10 +79,19 @@ struct Display {
     }
 
     void clear() {
-        uint32_t width, height;
-        // TODO
+        uint32_t w = div_ceil<uint32_t>(width, 8);
+        uint32_t h = height;
+        for (uint32_t i = 0; i < w * h; i++) {
+            // send 0xff
+        }
+        for (uint32_t i = 0; i < w * h; i++) {
+            // send 0x00
+        }
+        // Turn on display
     }
 
   private:
     hwif::hwif &hwif;
+    static constexpr uint32_t width = 800;
+    static constexpr uint32_t height = 480;
 };
