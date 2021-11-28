@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "hwif.hpp"
 
 template <typename T> constexpr T div_ceil(T n, T d) {
@@ -81,13 +83,20 @@ struct Display {
     void clear() {
         uint32_t w = div_ceil<uint32_t>(width, 8);
         uint32_t h = height;
-        for (uint32_t i = 0; i < w * h; i++) {
-            // send 0xff
-        }
-        for (uint32_t i = 0; i < w * h; i++) {
-            // send 0x00
-        }
-        // Turn on display
+        std::vector<uint8_t> black(w * h);
+        std::vector<uint8_t> white(w * h);
+        std::ranges::fill(black, 0xFF);
+        std::ranges::fill(white, 0x00);
+        hwif.send(0x10, black);
+        hwif.send(0x13, white);
+        turn_on_display();
+    }
+
+    void turn_on_display() {
+        using namespace std::literals::chrono_literals;
+        hwif.send(0x12);                    // Display refresh
+        std::this_thread::sleep_for(100ms); // Sample code claims this to be needed
+        hwif.wait_for_idle();
     }
 
   private:

@@ -37,13 +37,24 @@ struct hwif {
         set_interval(0);
     }
 
+    void send(uint8_t cmd, std::span<uint8_t> data) {
+        auto selected = pins.select.keep_active();
+        send(cmd);
+        transfer(data.data(), data.size());
+    }
+
     void send(uint8_t cmd, std::initializer_list<uint8_t> data) {
+        auto selected = pins.select.keep_active();
+        send(cmd);
+        transfer(data.begin(), data.size());
+    }
+
+    void send(uint8_t cmd) {
         auto selected = pins.select.keep_active();
         {
             auto ctrl = pins.control.keep_active();
-            transfer({cmd});
+            transfer(&cmd, 1);
         }
-        transfer(data);
     }
 
     void reset() {
@@ -59,8 +70,8 @@ struct hwif {
     void wait_for_idle() { pins.busy.wfi(); }
 
   private:
-    void transfer(std::initializer_list<uint8_t> data) {
-        std::vector<uint8_t> buffer(std::begin(data), std::end(data));
+    void transfer(const uint8_t *data, size_t size) {
+        std::vector<uint8_t> buffer(data, data + size);
         fmt::print("writing {}\n", buffer);
     }
 
@@ -73,7 +84,7 @@ struct hwif {
         }
     }
 
-    // TODO: The functions below can be merged to pretty much on IOCTL
+    // TODO: The functions below can be merged to pretty much one IOCTL
     void set_bits_per_word() {
         uint8_t bits = 8;
         if (ioctl(*fd, SPI_IOC_WR_BITS_PER_WORD, &bits) < 0) {

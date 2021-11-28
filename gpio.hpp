@@ -1,5 +1,7 @@
 #pragma once
 
+#include <algorithm>
+
 #include "file.hpp"
 
 namespace Gpio {
@@ -19,24 +21,13 @@ struct Output {
     };
 
     Output(Active level, uint32_t pin) : level(level), pin(pin) {
-        // int fd = open("/sys/class/gpio/export", O_WRONLY);
         File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
         std::string gpio_dir = fmt::format("/sys/class/gpio/gpio{}/", pin);
         File(gpio_dir + "direction", O_WRONLY).write("out");
         output = std::make_unique<File>(gpio_dir + "value", O_WRONLY);
-        // Write  pin number to fd
-        // TODO can fmtlib create strings?
-        // if (fd >= 0) close(fd);
-
-        // TODO open "/sys/class/gpio/gpio<pin>/direction
-        // TODO write "out" to file
-        // TODO
-        // TODO open "/sys/class/gpio/gpio<pin>/value", and keep open
     }
 
     ~Output() {
-        // close `value` fd
-        // open "sys/class/unexport" and write pin number
         output.reset(nullptr);
         File("/sys/class/gpio/unexport", O_WRONLY).write(fmt::format("{}", pin));
     }
@@ -44,18 +35,25 @@ struct Output {
     ActiveScope keep_active() { return ActiveScope(*this); }
 
     void activate() {
-        fmt::print("Activating {}\n", pin);
-        write(*output, level == Active::Low ? "0" : "1", 1);
+        if (activation_count == 0) {
+            fmt::print("Activating {}\n", pin);
+            write(*output, level == Active::Low ? "0" : "1", 1);
+        }
+        activation_count += 1;
     }
 
     void deactive() {
-        fmt::print("Deactivating {}\n", pin);
-        write(*output, level == Active::Low ? "1" : "0", 1);
+        activation_count = std::min<uint32_t>(activation_count - 1, 0);
+        if (activation_count-- == 0) {
+            fmt::print("Deactivating {}\n", pin);
+            write(*output, level == Active::Low ? "1" : "0", 1);
+        }
     }
 
   private:
     Active level;
     uint32_t pin;
+    uint32_t activation_count = 0;
     std::unique_ptr<File> output;
 };
 
