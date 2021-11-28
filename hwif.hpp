@@ -22,6 +22,53 @@ struct Pins {
     Gpio::Input busy;
 };
 
+enum class Command : uint8_t {
+    PanelSettings = 0x00,
+    PowerSettings = 0x01,
+    PowerOff = 0x02,
+    PowerOffSequenceSettings = 0x03,
+    PowerOn = 0x04,
+    PowerOnMeasures = 0x05,
+    BoosterSoftStart = 0x06,
+    DeepSleep = 0x07,
+    DisplayStartTransmission1 = 0x10,
+    DataStop = 0x11,
+    DisplayRefresh = 0x12,
+    DisplayStartTransmission2 = 0x13,
+    DualSPI = 0x15,
+    AutoSequence = 17,
+    KWLUOption = 0x2B,
+    PLLControl = 0x30,
+    TemperatureSensorCalibration = 0x40,
+    TemperatureSensorSelection = 0x41,
+    TemperatureSensorWrite = 0x42,
+    TemperatureSensorRead = 0x43,
+    PanelBreakCheck = 0x44,
+    VCOMDataIntervalSetting = 0x50,
+    LowPowerDetection = 0x51,
+    EndVoldateSetting = 0x52,
+    TCONSetting = 0x60,
+    ResolutionSetting = 0x61,
+    GateSourceStartSetting = 0x65,
+    Revision = 0x70,
+    GetStatus = 0x71,
+    AutoMeasurementVCOM = 0x80,
+    ReadVCOMValue = 0x81,
+    VCOMDCSetting = 0x82,
+    PartialWindow = 0x90,
+    PartialIn = 0x91,
+    PartialOut = 0x92,
+    ProgramMode = 0xA0,
+    ActiveProgramming = 0xA1,
+    ReadOTP = 0xA2,
+    CascadeSetting = 0xE0,
+    PowerSaving = 0xE3,
+    LVDVoltageSelect = 0xE4,
+    ForceTemperature = 0xE5,
+    TemperatureBoundryPhaseC2 = 0xE7,
+
+};
+
 struct hwif {
     hwif(std::string_view device, Pins &pins) : pins(pins) {
         // Open File O_RDWR
@@ -37,6 +84,22 @@ struct hwif {
         set_interval(0);
     }
 
+    template <typename T> void send(Command cmd, T data) { send(static_cast<uint8_t>(cmd), data); }
+    void send(Command cmd) { send(static_cast<uint8_t>(cmd)); }
+
+    void reset() {
+        using namespace std::literals::chrono_literals;
+        pins.reset.deactive();
+        std::this_thread::sleep_for(20ms);
+        pins.reset.activate();
+        std::this_thread::sleep_for(2ms);
+        pins.reset.deactive();
+        std::this_thread::sleep_for(20ms);
+    }
+
+    void wait_for_idle() { pins.busy.wfi(); }
+
+  private:
     void send(uint8_t cmd, std::span<uint8_t> data) {
         auto selected = pins.select.keep_active();
         send(cmd);
@@ -57,19 +120,6 @@ struct hwif {
         }
     }
 
-    void reset() {
-        using namespace std::literals::chrono_literals;
-        pins.reset.deactive();
-        std::this_thread::sleep_for(20ms);
-        pins.reset.activate();
-        std::this_thread::sleep_for(2ms);
-        pins.reset.deactive();
-        std::this_thread::sleep_for(20ms);
-    }
-
-    void wait_for_idle() { pins.busy.wfi(); }
-
-  private:
     void transfer(const uint8_t *data, size_t size) {
         std::vector<uint8_t> buffer(data, data + size);
         fmt::print("writing {}\n", buffer);
