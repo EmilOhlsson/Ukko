@@ -37,6 +37,11 @@ enum class Command : uint8_t {
     DisplayStartTransmission2 = 0x13,
     DualSPI = 0x15,
     AutoSequence = 17,
+    LutVcom = 0x20,  // Is this really on v2?
+    LutBlue = 0x21,  // Is this really on v2?
+    LutWhite = 0x22, // Is this really on v2?
+    LutGray1 = 0x23, // Is this really on v2?
+    LutGray2 = 0x23, // Is this really on v2?
     KWLUOption = 0x2B,
     PLLControl = 0x30,
     TemperatureSensorCalibration = 0x40,
@@ -85,6 +90,10 @@ struct hwif {
     }
 
     template <typename T> void send(Command cmd, T data) { send(static_cast<uint8_t>(cmd), data); }
+    void send(Command cmd, std::span<uint8_t> data) { send(static_cast<uint8_t>(cmd), data); }
+    void send(Command cmd, std::initializer_list<uint8_t> data) {
+        send(static_cast<uint8_t>(cmd), data);
+    }
     void send(Command cmd) { send(static_cast<uint8_t>(cmd)); }
 
     void reset() {

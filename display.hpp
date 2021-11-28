@@ -1,6 +1,7 @@
 #pragma once
 
 #include <algorithm>
+#include <assert.h>
 
 #include "hwif.hpp"
 
@@ -11,6 +12,7 @@ template <typename T> constexpr T div_ceil(T n, T d) {
 struct Display {
     Display(hwif::hwif &hwif) : hwif(hwif) {}
 
+    // TODO, this might make more sense to have in hwif
     void init() {
         using namespace std::literals::chrono_literals;
         using namespace hwif;
@@ -42,28 +44,28 @@ struct Display {
         hwif.send(Command::GateSourceStartSetting, {0x00, 0x00, 0x00, 0x00}); // Gate/source start
         {
             // LUT setup
-            hwif.send(0x20,
+            hwif.send(Command::LutVcom,
                       {
                           // LUT VCOM
                           0x0, 0xF, 0xF, 0x0, 0x0, 0x1, 0x0, 0xF, 0x1, 0xF, 0x1, 0x2, 0x0, 0xF,
                           0xF, 0x0, 0x0, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                           0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0,
                       });
-            hwif.send(0x21,
+            hwif.send(Command::LutBlue,
                       {
                           // LUT WW
                           0x10, 0xF, 0xF, 0x0, 0x0, 0x1, 0x84, 0xF, 0x1, 0xF, 0x1, 0x2, 0x20, 0xF,
                           0xF,  0x0, 0x0, 0x1, 0x0, 0x0, 0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0,
                           0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0,
                       });
-            hwif.send(0x22,
+            hwif.send(Command::LutWhite,
                       {
                           // LUT BW
                           0x10, 0xF, 0xF, 0x0, 0x0, 0x1, 0x84, 0xF, 0x1, 0xF, 0x1, 0x2, 0x20, 0xF,
                           0xF,  0x0, 0x0, 0x1, 0x0, 0x0, 0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0,
                           0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0,
                       });
-            hwif.send(0x23,
+            hwif.send(Command::LutGray1,
                       {
                           // LUT WB
                           0x80, 0xF, 0xF, 0x0, 0x0, 0x1, 0x84, 0xF, 0x1, 0xF, 0x1, 0x2, 0x40, 0xF,
@@ -71,7 +73,7 @@ struct Display {
                           0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0, 0x0, 0x0, 0x0, 0x0, 0x0,  0x0,
 
                       });
-            hwif.send(0x24,
+            hwif.send(Command::LutGray2,
                       {
                           // LUT BB
                           0x80, 0xF, 0xF, 0x0, 0x0, 0x1, 0x84, 0xF, 0x1, 0xF, 0x1, 0x2, 0x40, 0xF,
@@ -82,10 +84,11 @@ struct Display {
     }
 
     void clear() {
+        using namespace hwif;
         std::ranges::fill(fb, 0xFF);
-        hwif.send(0x10, fb); // Display start transmission
+        hwif.send(Command::DisplayStartTransmission1, fb); // Display start transmission
         std::ranges::fill(fb, 0x00);
-        hwif.send(0x13, fb); // Display start transmission2
+        hwif.send(Command::DisplayStartTransmission2, fb); // Display start transmission2
         turn_on_display();
     }
 
@@ -96,17 +99,45 @@ struct Display {
         hwif.wait_for_idle();
     }
 
-    void display_test_pattern() {
+    void sleep() {
         using namespace hwif;
-        // Note
+        hwif.send(Command::PowerOff);
+        hwif.wait_for_idle();
+        hwif.send(Command::DeepSleep, {0x07});
+    }
+
+    /**
+     * Render framebuffer to screen
+     */
+    void draw_fb() {
+        using namespace hwif;
         hwif.send(Command::DisplayStartTransmission2, fb);
+        turn_on_display();
+    }
+
+    /**
+     * Draw data to frame buffer
+     */
+    void set_fb(const uint8_t *data, size_t size) {
+        assert(size <= width * height);
+        assert(size % bpb == 0);
+        for (uint32_t i = 0; i < size; i += 8) {
+            uint8_t page = 0;
+            for (uint32_t px = 0; px < bpb; px += 1) {
+                page <<= 1;
+                page |= data[i + px] ? 1 : 0;
+            }
+            fb[width_bytes * (i / width) + (i % width)] = page;
+        }
     }
 
   private:
     hwif::hwif &hwif;
+    static constexpr uint32_t bpb = 8; // Bits per byte
     static constexpr uint32_t width = 800;
+    static constexpr uint32_t width_bytes = div_ceil(width, bpb);
     static constexpr uint32_t height = 480;
 
     // Frame buffer. Note that each pixel is 1 bit, so each element is 8 pixels
-    std::vector<uint8_t> fb = std::vector<uint8_t>(div_ceil<uint32_t>(width, 8) * height);
+    std::vector<uint8_t> fb = std::vector<uint8_t>(width_bytes * height);
 };

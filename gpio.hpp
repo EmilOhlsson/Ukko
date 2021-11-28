@@ -28,6 +28,8 @@ struct Output {
     }
 
     ~Output() {
+        // Ground output before removing
+        write(*output, "0", 1);
         output.reset(nullptr);
         File("/sys/class/gpio/unexport", O_WRONLY).write(fmt::format("{}", pin));
     }
