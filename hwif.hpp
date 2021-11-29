@@ -132,6 +132,19 @@ struct hwif {
     void transfer(const uint8_t *data, size_t size) {
         std::vector<uint8_t> buffer(data, data + size);
         fmt::print("writing {}\n", buffer);
+        if (write(*fd, data, size) < 0) {
+            throw std::runtime_error(
+                fmt::format("Unable to write data to SPI: {}", strerror(errno)));
+        }
+        // spi_ioc_transfer tr {
+        //     .tx_buf = reinterpret_cast<__u64>(data),
+        //     .rx_buf = 0,
+        //     .len = static_cast<uint32_t>(size),
+        // };
+        // if (ioctl(*fd, SPI_IOC_MESSAGE(1), &tr) < 0) {
+        //     throw std::runtime_error(fmt::format("Unable to write data to SPI: {}",
+        //     strerror(errno)));
+        // }
     }
 
     void set_speed(uint32_t speed) {
