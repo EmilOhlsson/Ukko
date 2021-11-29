@@ -21,6 +21,7 @@ struct Output {
     };
 
     Output(Active level, uint32_t pin) : level(level), pin(pin) {
+        fmt::print("Exporting pin {}\n", pin);
         File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
         std::string gpio_dir = fmt::format("/sys/class/gpio/gpio{}/", pin);
         File(gpio_dir + "direction", O_WRONLY).write("out");
