@@ -1,6 +1,9 @@
 #pragma once
 
 #include <algorithm>
+#include <filesystem>
+#include <fstream>
+#include <memory>
 
 #include "file.hpp"
 
@@ -22,11 +25,17 @@ struct Output {
 
     Output(Active level, uint32_t pin) : level(level), pin(pin) {
         fmt::print("Exporting pin {}\n", pin);
-        // TODO Only need to export pin if it's not already set up
-        File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
-        std::string gpio_dir = fmt::format("/sys/class/gpio/gpio{}/", pin);
-        File(gpio_dir + "direction", O_WRONLY).write("out");
-        output = std::make_unique<File>(gpio_dir + "value", O_WRONLY);
+        if (std::filesystem::exists(fmt::format("{}gpio{}", gpio_dir, pin))) {
+            // TODO: Check direction, if wrong abort
+            std::ifstream direction(fmt::format("{}/gpio{}/direction", gpio_dir, pin));
+            std::string content;
+            std::getline(direction, content);
+        } else {
+            // TODO Only need to export pin if it's not already set up
+            File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
+            File(fmt::format("{}/gpio{}/direction", gpio_dir, pin), O_WRONLY).write("out");
+        }
+        output = std::make_unique<File>(fmt::format("{}/gpio{}/value", gpio_dir, pin), O_WRONLY);
     }
 
     ~Output() {
@@ -59,11 +68,12 @@ struct Output {
     uint32_t pin;
     uint32_t activation_count = 0;
     std::unique_ptr<File> output;
+    static constexpr std::string_view gpio_dir = "/sys/class/gpio";
 };
 
 struct Input {
     // TODO: Create something that would be usable by future
-    Input(uint32_t pin) : pin(pin) {
+    Input(uint32_t pin) {
         File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
         std::string gpio_dir = fmt::format("/sys/class/gpio/gpio{}/", pin);
         File(gpio_dir + "direction", O_WRONLY).write("in");
@@ -91,7 +101,6 @@ struct Input {
     }
 
   private:
-    uint32_t pin;
     std::unique_ptr<File> input;
 };
 

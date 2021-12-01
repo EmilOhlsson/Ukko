@@ -10,6 +10,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+/**
+ * Representing a file with an accesible file descriptor
+ */
 struct File {
     File(std::string_view filename, int flags) {
         fmt::print("Opening {}\n", filename);
