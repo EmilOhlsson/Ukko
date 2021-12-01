@@ -18,7 +18,6 @@ namespace hwif {
 struct Pins {
     Gpio::Output reset;
     Gpio::Output control;
-    Gpio::Output select;
     Gpio::Input busy;
 };
 
@@ -110,19 +109,16 @@ struct hwif {
 
   private:
     void send(uint8_t cmd, std::span<uint8_t> data) {
-        auto selected = pins.select.keep_active();
         send(cmd);
         transfer(data.data(), data.size());
     }
 
     void send(uint8_t cmd, std::initializer_list<uint8_t> data) {
-        auto selected = pins.select.keep_active();
         send(cmd);
         transfer(data.begin(), data.size());
     }
 
     void send(uint8_t cmd) {
-        auto selected = pins.select.keep_active();
         {
             auto ctrl = pins.control.keep_active();
             transfer(&cmd, 1);

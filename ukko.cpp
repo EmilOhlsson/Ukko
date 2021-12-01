@@ -11,7 +11,6 @@ int main() {
     hwif::Pins control_pins{
         .reset = Gpio::Output(Gpio::Active::Low, 17),
         .control = Gpio::Output(Gpio::Active::Low, 25),
-        .select = Gpio::Output(Gpio::Active::Low, 8),
         .busy = Gpio::Input(24),
     };
 

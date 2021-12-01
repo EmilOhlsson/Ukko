@@ -5,7 +5,7 @@ HDRS = $(wildcard *.hpp)
 OBJS = $(SRCS:.cpp=.o)
 
 CXXFLAGS += -Wall -Wextra 
-CXXFLAGS += -MMD -Og
+CXXFLAGS += -MMD -Og -g
 CXXFLAGS += -std=c++20
 
 LDLIBS = -lstdc++ -lfmt
@@ -16,4 +16,4 @@ format:
 clean:
 	rm -f $(OBJS) ukko
 
--include: *.d
+-include *.d
