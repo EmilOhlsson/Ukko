@@ -10,10 +10,12 @@ CXXFLAGS += -std=c++20
 
 LDLIBS = -lstdc++ -lfmt
 
+ukko: $(OBJS)
+
 all: ukko
 format:
 	clang-format -i $(SRCS) $(HDRS)
 clean:
-	rm -f $(OBJS) ukko
+	rm -f $(OBJS) ukko *.d
 
 -include *.d
