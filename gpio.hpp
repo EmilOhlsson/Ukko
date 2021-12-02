@@ -24,14 +24,17 @@ struct Output {
     };
 
     Output(Active level, uint32_t pin) : level(level), pin(pin) {
+        /* If GPIO already is exported, check if it's configured as output. If it's not already
+         * exported, then export and configure as output */
         fmt::print("Exporting pin {}\n", pin);
-        if (std::filesystem::exists(fmt::format("{}gpio{}", gpio_dir, pin))) {
-            // TODO: Check direction, if wrong abort
-            std::ifstream direction(fmt::format("{}/gpio{}/direction", gpio_dir, pin));
-            std::string content;
-            std::getline(direction, content);
+        if (std::filesystem::exists(fmt::format("{}/gpio{}", gpio_dir, pin))) {
+            std::ifstream direction_stream(fmt::format("{}/gpio{}/direction", gpio_dir, pin));
+            std::string direction;
+            std::getline(direction_stream, direction);
+            if (direction != "out") {
+                throw std::runtime_error(fmt::format("gpio {} is already as input", pin));
+            }
         } else {
-            // TODO Only need to export pin if it's not already set up
             File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
             File(fmt::format("{}/gpio{}/direction", gpio_dir, pin), O_WRONLY).write("out");
         }
@@ -39,7 +42,7 @@ struct Output {
     }
 
     ~Output() {
-        // Ground output before removing
+        /* Ground output before removing */
         write(*output, "0", 1);
         output.reset(nullptr);
         File("/sys/class/gpio/unexport", O_WRONLY).write(fmt::format("{}", pin));
@@ -72,17 +75,23 @@ struct Output {
 };
 
 struct Input {
-    // TODO: Create something that would be usable by future
     Input(uint32_t pin) {
-        File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
-        std::string gpio_dir = fmt::format("/sys/class/gpio/gpio{}/", pin);
-        File(gpio_dir + "direction", O_WRONLY).write("in");
-        File(gpio_dir + "edge", O_WRONLY).write("rising");
+        fmt::print("Exporting input pin {}\n", pin);
+        if (std::filesystem::exists(fmt::format("{}/gpio{}", gpio_dir, pin))) {
+            std::ifstream direction_stream(fmt::format("{}/gpio{}/direction", gpio_dir, pin));
+            std::string direction;
+            std::getline(direction_stream, direction);
+            if (direction != "in") {
+                throw std::runtime_error(
+                    fmt::format("gpio {} is already configured as output", pin));
+            }
+        } else {
+            File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
+            File(fmt::format("{}/gpio{}/direction", gpio_dir, pin), O_WRONLY).write("in");
+            File(fmt::format("{}/gpio{}/edge", gpio_dir, pin), O_WRONLY).write("rising");
+        }
 
-        input = std::make_unique<File>(gpio_dir + "value", O_RDONLY);
-        // Open as above and export pin, set it as "in"
-        // Open value file and keep open
-        // TODO check how to support C++ futures
+        input = std::make_unique<File>(fmt::format("{}/gpio{}/value", gpio_dir, pin), O_RDONLY);
     }
 
     void wfi() {
@@ -102,6 +111,7 @@ struct Input {
 
   private:
     std::unique_ptr<File> input;
+    static constexpr std::string_view gpio_dir = "/sys/class/gpio";
 };
 
 } // namespace Gpio
