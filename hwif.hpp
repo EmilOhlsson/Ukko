@@ -16,9 +16,9 @@
 namespace hwif {
 
 struct Pins {
-    Gpio::Output reset;
-    Gpio::Output control;
-    Gpio::Input busy;
+    gpio::Output reset;
+    gpio::Output control;
+    gpio::Input busy;
 };
 
 enum class Command : uint8_t {
@@ -73,17 +73,17 @@ enum class Command : uint8_t {
 
 };
 
-struct hwif {
-    hwif(std::string_view device, Pins &pins) : pins(pins) {
+struct Hwif {
+    Hwif(std::string_view device, Pins &pins) : pins(pins) {
         // Open File O_RDWR
         // uint8_t bits = 8;
         // ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
         // Check DEV_HARDWARE_SPI_begin()
-        fd = std::make_unique<File>(device, O_RDWR);
+        fd = std::make_unique<File>(device, O_RDWR | O_SYNC);
 
         set_mode(SPI_MODE_0);
         set_chip_select(CS_Mode::Low);
-        set_bit_order(BitOrder::LsbFirst);
+        // set_bit_order(BitOrder::LsbFirst);
         set_speed(10000000);
         set_interval(0);
     }
@@ -110,28 +110,68 @@ struct hwif {
   private:
     void send(uint8_t cmd, std::span<uint8_t> data) {
         send(cmd);
+        fmt::print("HAI!\n");
         transfer(data.data(), data.size());
     }
 
     void send(uint8_t cmd, std::initializer_list<uint8_t> data) {
         send(cmd);
+        fmt::print("IHA!\n");
         transfer(data.begin(), data.size());
     }
 
     void send(uint8_t cmd) {
-        {
-            auto ctrl = pins.control.keep_active();
-            transfer(&cmd, 1);
-        }
+        //{
+        //    auto ctrl = pins.control.keep_active();
+        //    transfer(&cmd, 1);
+        //}
+        pins.control.activate();
+        transfer(&cmd, 1);
+        pins.control.deactive();
     }
 
     void transfer(const uint8_t *data, size_t size) {
         std::vector<uint8_t> buffer(data, data + size);
-        fmt::print("writing {}\n", buffer);
-        if (write(*fd, data, size) < 0) {
-            throw std::runtime_error(
-                fmt::format("Unable to write data to SPI: {}", strerror(errno)));
+        fmt::print("  writing {}\n", buffer);
+        // if (write(*fd, data, size) < 0) {
+        //     throw std::runtime_error(
+        //         fmt::format("Unable to write data to SPI: {}", strerror(errno)));
+        // }
+
+        // uint8_t rbuf[1];
+        // spi_ioc_transfer tr {
+        //	.tx_buf = 0,
+        //	.rx_buf = (unsigned long)rbuf,
+        //	.len = 1,
+        //	.speed_hz = 10'000'000,
+        //	.delay_usecs = 0,
+        //	.bits_per_word = 8,
+        //	.cs_change = 0,
+        //	.pad = 0,
+        // };
+
+        // for (size_t i = 0; i < size; i++) {
+        //	tr.tx_buf = (unsigned long)data + i;
+        //	if (ioctl(*fd, SPI_IOC_MESSAGE(1), &tr) < 1) {
+        //		throw std::runtime_error("Unable to  send SPI message");
+        //	}
+        // }
+
+        size_t chunk = 64;
+        size_t written = 0;
+        while (written < size) {
+            size_t win = std::min(size - written, chunk);
+            // fmt::print(" Writing {}-{}/{} bytes\n", written, written + win, size);
+            //  TODO might need something better here...
+            // fmt::print(" - - - -- -WRITING! {} win={}\n", *(buffer.data() + written), win);
+            if (write(*fd, buffer.data() + written, win) < 0) {
+                throw std::runtime_error(
+                    fmt::format("Unable to write data to SPI: {}", strerror(errno)));
+            }
+            // fmt::print("Did write stuff\n");
+            written += win;
         }
+
         // spi_ioc_transfer tr {
         //     .tx_buf = reinterpret_cast<__u64>(data),
         //     .rx_buf = 0,
@@ -193,7 +233,7 @@ struct hwif {
             }
         }
         if (ioctl(*fd, SPI_IOC_WR_MODE, &m_mode) < 0) {
-            throw std::runtime_error(fmt::format("Unable to set hwif mode: {}", strerror(errno)));
+            throw std::runtime_error(fmt::format("Unable to set hwif cs: {}", strerror(errno)));
         }
     }
 
@@ -202,19 +242,20 @@ struct hwif {
         MsbFirst,
     };
 
-    void set_bit_order(BitOrder order) {
-        switch (order) {
-            case BitOrder::LsbFirst:
-                m_mode |= SPI_LSB_FIRST;
-                break;
-            case BitOrder::MsbFirst:
-                m_mode &= ~SPI_LSB_FIRST;
-                break;
-        }
-        if (ioctl(*fd, SPI_IOC_WR_MODE, &m_mode) < 0) {
-            throw std::runtime_error(fmt::format("Unable to set hwif mode: {}", strerror(errno)));
-        }
-    }
+    // void set_bit_order(BitOrder order) {
+    //     switch (order) {
+    //         case BitOrder::LsbFirst:
+    //             m_mode |= SPI_LSB_FIRST;
+    //             break;
+    //         case BitOrder::MsbFirst:
+    //             m_mode &= ~SPI_LSB_FIRST;
+    //             break;
+    //     }
+    //     if (ioctl(*fd, SPI_IOC_WR_MODE, &m_mode) < 0) {
+    //         throw std::runtime_error(fmt::format("Unable to set hwif bit order: {}",
+    //         strerror(errno)));
+    //     }
+    // }
 
     enum class BusMode {
         ThreeWire,
@@ -231,7 +272,8 @@ struct hwif {
                 break;
         }
         if (ioctl(*fd, SPI_IOC_WR_MODE, &m_mode) < 0) {
-            throw std::runtime_error(fmt::format("Unable to set hwif mode: {}", strerror(errno)));
+            throw std::runtime_error(
+                fmt::format("Unable to set hwif bus mode: {}", strerror(errno)));
         }
     }
 

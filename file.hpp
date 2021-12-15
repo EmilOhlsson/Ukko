@@ -32,6 +32,7 @@ struct File {
     }
 
     template <typename T> void write(std::span<T> data) {
+        fmt::print("GPIO: Writing {} to {}\n", data, filename);
         ssize_t result = ::write(fd, data.data(), sizeof(T) * data.size());
         if (result < 0) {
             // TODO it might be that we need some gracious handling here

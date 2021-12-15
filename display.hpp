@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <assert.h>
+#include <cairomm/surface.h>
 
 #include "hwif.hpp"
 
@@ -10,7 +11,7 @@ template <typename T> constexpr T div_ceil(T n, T d) {
 }
 
 struct Display {
-    Display(hwif::hwif &hwif) : hwif(hwif) {}
+    Display(hwif::Hwif &hwif) : hwif(hwif) {}
 
     // TODO, this might make more sense to have in hwif
     void init() {
@@ -88,12 +89,14 @@ struct Display {
         std::ranges::fill(fb, 0xFF);
         hwif.send(Command::DisplayStartTransmission1, fb); // Display start transmission
         std::ranges::fill(fb, 0x00);
+        fmt::print(" Writing clear\n");
         hwif.send(Command::DisplayStartTransmission2, fb); // Display start transmission2
         turn_on_display();
     }
 
     void turn_on_display() {
         using namespace std::literals::chrono_literals;
+        fmt::print(" Turning on display\n");
         hwif.send(hwif::Command::DisplayRefresh); // Display refresh
         std::this_thread::sleep_for(100ms);       // Sample code claims this to be needed
         hwif.wait_for_idle();
@@ -111,7 +114,10 @@ struct Display {
      */
     void draw_fb() {
         using namespace hwif;
-        hwif.send(Command::DisplayStartTransmission2, fb);
+        fmt::print(" Drawing framebuffer\n");
+        std::vector<uint8_t> buffer(800 * 480);
+        std::ranges::fill(buffer, 0x99);
+        hwif.send(hwif::Command::DisplayStartTransmission2, buffer);
         turn_on_display();
     }
 
@@ -119,6 +125,7 @@ struct Display {
      * Draw data to frame buffer
      */
     void set_fb(const uint8_t *data, size_t size) {
+        // TODO THIS HAS A BUG!!!!!!
         assert(size <= width * height);
         assert(size % bpb == 0);
         for (uint32_t i = 0; i < size; i += 8) {
@@ -127,12 +134,12 @@ struct Display {
                 page <<= 1;
                 page |= data[i + px] ? 1 : 0;
             }
-            fb[width_bytes * (i / width) + (i % width)] = page;
+            fb[i / bpb] = page;
         }
     }
 
   private:
-    hwif::hwif &hwif;
+    hwif::Hwif &hwif;
     static constexpr uint32_t bpb = 8; // Bits per byte
     static constexpr uint32_t width = 800;
     static constexpr uint32_t width_bytes = div_ceil(width, bpb);
