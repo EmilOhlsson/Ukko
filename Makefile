@@ -18,7 +18,7 @@ CXXFLAGS += $$(pkg-config --cflags cairomm-1.0)
 CXXFLAGS += $(CXXFLAGS_$(PROFILE))
 
 LDLIBS_SANITIZE += -static-libasan
-LDLIBS += -lstdc++ -lfmt -lgpiod $$(pkg-config -libs cairomm-1.0) -lcurl
+LDLIBS += -lstdc++ -lfmt -lgpiod $$(pkg-config --libs cairomm-1.0) -lcurl
 LDLIBS += $(LDLIBS_$(PROFILE))
 
 LDFLAGS_SANITIZE = -fsanitize=address
