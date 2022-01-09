@@ -8,6 +8,7 @@
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 #include <fmt/ranges.h>
+#include <optional>
 #include <sstream>
 #include <vector>
 
@@ -23,30 +24,21 @@ struct weather {
         double gusts;
     };
 
-    weather() {
-        const std::string longitude = "13.18120";
-        const std::string latitude = "55.70487";
-        const std::string url = fmt::format(
-            "https://opendata-download-metfcst.smhi.se"
-            "/api/category/pmp3g/version/2/geotype/point/lon/{}/lat/{}/data.json",
-            longitude, latitude);
+    weather(std::optional<std::string> store_forecast = std::nullopt,
+            std::optional<std::string> load_forecast = std::nullopt)
+        : load_file(load_forecast), store_file(store_forecast) {}
 
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
-        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
-        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-    }
-
-    ~weather() { curl_easy_cleanup(curl); }
+    ~weather() {}
 
     std::vector<Hour> retrieve() {
-        std::string weather_data{};
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &weather_data);
-        curl_easy_perform(curl);
-        // TODO Check if this keeps connection open.
+        json weather;
+        if (load_file) {
+            weather = load_forecast(*load_file);
+        } else {
+            weather = fetch_forecast();
+        }
 
-        json weather = json::parse(weather_data);
+        if (store_file) { store_forecast(*store_file); }
 
         assert(weather.is_object());
         for (auto &[key, value] : weather.items()) { fmt::print("Key: {}\n", key); }
@@ -103,9 +95,41 @@ struct weather {
     }
 
   private:
+    std::optional<std::string> load_file{};
+    std::optional<std::string> store_file{};
+
     char errbuf[CURL_ERROR_SIZE]{};
-    CURL *curl = curl_easy_init();
     std::vector<Hour> hours{};
+
+    json load_forecast(std::string_view filename) {
+        // TODO load from file
+        return {};
+    }
+
+    void store_forecast(std::string_view filename) {}
+
+    json fetch_forecast() {
+        const std::string longitude = "13.18120";
+        const std::string latitude = "55.70487";
+        const std::string url = fmt::format(
+            "https://opendata-download-metfcst.smhi.se"
+            "/api/category/pmp3g/version/2/geotype/point/lon/{}/lat/{}/data.json",
+            longitude, latitude);
+
+        CURL *curl = curl_easy_init();
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
+        curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
+        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+        std::string weather_data{};
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &weather_data);
+        curl_easy_perform(curl);
+        curl_easy_cleanup(curl);
+        // TODO Check if this keeps connection open.
+
+        return json::parse(weather_data);
+    }
 
     static size_t write_cb(void *data, size_t size, size_t nmemb, void *userp) {
         assert(size == 1);

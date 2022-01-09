@@ -1,4 +1,6 @@
 #include <fmt/core.h>
+#include <getopt.h>
+#include <optional>
 
 #include "display.hpp"
 #include "gpio.hpp"
@@ -10,9 +12,60 @@
 
 static constexpr bool DRY_RUN = DUMMY;
 
-int main() {
+struct Options {
+    std::optional<std::string> forecast_load{};
+    std::optional<std::string> forecast_store{};
+    bool verbose;
+};
+
+int run(const Options &);
+
+int main(int argc, char **argv) {
     fmt::print("Using dry_run={}\n", DRY_RUN);
 
+    int c;
+
+    const static option options_available[] = {
+        {"verbose", no_argument, nullptr, 'v'},
+        {"help", no_argument, nullptr, 'h'},
+        {"store-forecast", required_argument, nullptr, 's'},
+        {"load-forecast", required_argument, nullptr, 'l'},
+    };
+
+    Options options_used{};
+
+    while (true) {
+        int option_index = 0;
+        c = getopt_long(argc, argv, "hvs:l:", options_available, &option_index);
+        if (c == -1) { break; }
+
+        switch (c) {
+            case 'v':
+                fmt::print("Using verbose mode\n");
+                break;
+
+            case 'h':
+                // TODO
+                fmt::print("Print usage instructions, and exit\n");
+                exit(0);
+                break;
+
+            case 's':
+                fmt::print("Store forecast data to {}\n", optarg);
+                options_used.forecast_store = optarg;
+                break;
+
+            case 'l':
+                fmt::print("Load forecast data from {}\n", optarg);
+                options_used.forecast_load = optarg;
+                break;
+        }
+    }
+
+    return run(options_used);
+}
+
+int run(const Options &options) {
     // TODO: Read parameters
     //  - Store forecast to file
     //    - Update weather class, and change its name to forecast
