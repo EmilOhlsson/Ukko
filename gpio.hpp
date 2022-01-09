@@ -26,7 +26,7 @@ struct Output {
     // };
 
     Output(Active level, uint32_t pin) : level(level), pin(pin) {
-	    // TODO: use GPIOD
+        // TODO: use GPIOD
         using namespace std::literals::chrono_literals;
         /* If GPIO already is exported, check if it's configured as output. If it's not already
          * exported, then export and configure as output */
@@ -75,7 +75,7 @@ struct Output {
         output->write(level == Active::Low ? "1" : "0");
         //} else {
         //	fmt::print("   Skipping deactivation of pin {}, count is now {}\n", pin,
-        //activation_count);
+        // activation_count);
         //}
     }
 
@@ -149,8 +149,7 @@ struct Input {
         } while (0);
         // std::this_thread::sleep_for(5ms);
         // TODO: this should have a timeout, and check if busy is already high
-	await();
-
+        await();
 
         gpiod_line_release(line);
         gpiod_chip_close(chip);

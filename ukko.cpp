@@ -3,14 +3,37 @@
 #include "display.hpp"
 #include "gpio.hpp"
 #include "hwif.hpp"
-#include "something.hpp"
 #include "net-stuff.hpp"
+#include "screen.hpp"
+#include "something.hpp"
+#include "weather.hpp"
+
+static constexpr bool DRY_RUN = DUMMY;
 
 int main() {
-    do_stuff_with_cairo();
-    do_curl_stuff();
-    exit(0);
+    fmt::print("Using dry_run={}\n", DRY_RUN);
 
+    // TODO: Read parameters
+    //  - Store forecast to file
+    //    - Update weather class, and change its name to forecast
+    //    - Come up with a better name than "Hours" for forecast data points
+    //  - Load forecast to file (to reduce network traffic)
+    //  - Draw forecast in screen
+
+    weather weather{};
+
+    std::vector<weather::Hour> dps = weather.retrieve();
+
+    Screen screen{};
+    screen.update(dps);
+    screen.draw();
+    screen.store();
+
+    // do_stuff_with_cairo();
+    // do_curl_stuff();
+
+    /* For now, simply bail if we're in dry run mode */
+    if (DRY_RUN) { exit(0); }
 
     using namespace std::literals::chrono_literals;
     fmt::print("Running\n");

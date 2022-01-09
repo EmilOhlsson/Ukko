@@ -22,4 +22,3 @@ void do_json_stuff() {
     json j_complete = json::parse(text);
     fmt::print("Stuff: {}\n\n", j_complete);
 }
-
