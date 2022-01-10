@@ -4,8 +4,8 @@ SRCS = $(wildcard *.cpp)
 HDRS = $(wildcard *.hpp)
 OBJS = $(SRCS:.cpp=.o)
 
-CC = g++
-CXX = g++
+CC ?= g++
+CXX ?= g++
 DUMMY ?= 1
 
 CXXFLAGS_SANITIZE = -fsanitize=address -fno-omit-frame-pointer

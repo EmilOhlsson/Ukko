@@ -15,40 +15,52 @@ static constexpr bool DRY_RUN = DUMMY;
 struct Options {
     std::optional<std::string> forecast_load{};
     std::optional<std::string> forecast_store{};
+    std::optional<std::string> screen_store{};
     bool verbose;
+    bool dry_run = DUMMY;
 };
 
 int run(const Options &);
 
 int main(int argc, char **argv) {
-    fmt::print("Using dry_run={}\n", DRY_RUN);
-
     int c;
 
     const static option options_available[] = {
+        {"dry-run", no_argument, nullptr, 'd'},
         {"verbose", no_argument, nullptr, 'v'},
         {"help", no_argument, nullptr, 'h'},
         {"store-forecast", required_argument, nullptr, 's'},
         {"load-forecast", required_argument, nullptr, 'l'},
+        {"store-screen", required_argument, nullptr, 'p'},
     };
 
     Options options_used{};
 
     while (true) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "hvs:l:", options_available, &option_index);
+        c = getopt_long(argc, argv, "dhvs:l:p:", options_available, &option_index);
         if (c == -1) { break; }
 
         switch (c) {
+            case 'd':
+                options_used.dry_run = true;
+                break;
+
             case 'v':
                 fmt::print("Using verbose mode\n");
                 break;
 
             case 'h':
-                // TODO
-                fmt::print("Print usage instructions, and exit\n");
+                fmt::print("Usage: ukko [flags]\n");
+                fmt::print(" -d | --dry-run                Do now write to HW interfaces\n");
+                fmt::print(" -h | --help                   Print this message and exit\n");
+                fmt::print(" -v | --verbose                Run in verbose mode\n");
+                fmt::print(
+                    " -l | --load-forecast <file>   Load forecast data from json formatted file\n");
+                fmt::print(
+                    " -s | --store-forecast <file>  Store forecast data to json formatted file\n");
+                fmt::print(" -p | --store-scrren <file>    Store screen as image file\n");
                 exit(0);
-                break;
 
             case 's':
                 fmt::print("Store forecast data to {}\n", optarg);
@@ -59,6 +71,10 @@ int main(int argc, char **argv) {
                 fmt::print("Load forecast data from {}\n", optarg);
                 options_used.forecast_load = optarg;
                 break;
+
+            case 'p':
+                fmt::print("Store screen image to {}\n", optarg);
+                options_used.screen_store = optarg;
         }
     }
 
@@ -67,20 +83,16 @@ int main(int argc, char **argv) {
 
 int run(const Options &options) {
     // TODO: Read parameters
-    //  - Store forecast to file
-    //    - Update weather class, and change its name to forecast
-    //    - Come up with a better name than "Hours" for forecast data points
-    //  - Load forecast to file (to reduce network traffic)
     //  - Draw forecast in screen
 
-    weather weather{};
+    fmt::print("Using dry_run={}\n", options.dry_run);
+
+    weather weather{options.forecast_load, options.forecast_store};
 
     std::vector<weather::Hour> dps = weather.retrieve();
 
-    Screen screen{};
-    screen.update(dps);
-    screen.draw();
-    screen.store();
+    Screen screen{options.screen_store};
+    screen.draw(dps);
 
     // do_stuff_with_cairo();
     // do_curl_stuff();

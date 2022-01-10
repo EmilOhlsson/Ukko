@@ -8,8 +8,10 @@
 #include <fmt/chrono.h>
 #include <fmt/core.h>
 #include <fmt/ranges.h>
+#include <iostream>
 #include <optional>
 #include <sstream>
+#include <string>
 #include <vector>
 
 #include "nlohmann/json.hpp"
@@ -24,8 +26,8 @@ struct weather {
         double gusts;
     };
 
-    weather(std::optional<std::string> store_forecast = std::nullopt,
-            std::optional<std::string> load_forecast = std::nullopt)
+    weather(std::optional<std::string> load_forecast = std::nullopt,
+            std::optional<std::string> store_forecast = std::nullopt)
         : load_file(load_forecast), store_file(store_forecast) {}
 
     ~weather() {}
@@ -38,7 +40,7 @@ struct weather {
             weather = fetch_forecast();
         }
 
-        if (store_file) { store_forecast(*store_file); }
+        if (store_file) { store_forecast(*store_file, weather); }
 
         assert(weather.is_object());
         for (auto &[key, value] : weather.items()) { fmt::print("Key: {}\n", key); }
@@ -101,12 +103,17 @@ struct weather {
     char errbuf[CURL_ERROR_SIZE]{};
     std::vector<Hour> hours{};
 
-    json load_forecast(std::string_view filename) {
-        // TODO load from file
-        return {};
+    json load_forecast(const std::string &filename) {
+        std::ifstream input{filename};
+        json result;
+        input >> result;
+        return result;
     }
 
-    void store_forecast(std::string_view filename) {}
+    void store_forecast(const std::string &filename, const json &j) {
+        std::ofstream out{filename};
+        out << std::setw(4) << j << std::endl;
+    }
 
     json fetch_forecast() {
         const std::string longitude = "13.18120";
