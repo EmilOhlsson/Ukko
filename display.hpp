@@ -5,10 +5,7 @@
 #include <cairomm/surface.h>
 
 #include "hwif.hpp"
-
-template <typename T> constexpr T div_ceil(T n, T d) {
-    return (n + d - 1) / d;
-}
+#include "utils.hpp"
 
 struct Display {
     Display(hwif::Hwif &hwif) : hwif(hwif) {}
@@ -142,7 +139,7 @@ struct Display {
     hwif::Hwif &hwif;
     static constexpr uint32_t bpb = 8; // Bits per byte
     static constexpr uint32_t width = 800;
-    static constexpr uint32_t width_bytes = div_ceil(width, bpb);
+    static constexpr uint32_t width_bytes = utils::div_ceil(width, bpb);
     static constexpr uint32_t height = 480;
 
     // Frame buffer. Note that each pixel is 1 bit, so each element is 8 pixels
