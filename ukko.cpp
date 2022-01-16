@@ -25,13 +25,15 @@ int run(const Options &);
 int main(int argc, char **argv) {
     int c;
 
-    const static option options_available[] = {{"dry-run", no_argument, nullptr, 'd'},
-                                               {"verbose", no_argument, nullptr, 'v'},
-                                               {"help", no_argument, nullptr, 'h'},
-                                               {"store-forecast", required_argument, nullptr, 's'},
-                                               {"load-forecast", required_argument, nullptr, 'l'},
-                                               {"store-screen", required_argument, nullptr, 'p'},
-                                               {}};
+    const static option options_available[] = {
+        {"dry-run", no_argument, nullptr, 'd'},
+        {"verbose", no_argument, nullptr, 'v'},
+        {"help", no_argument, nullptr, 'h'},
+        {"store-forecast", required_argument, nullptr, 's'},
+        {"load-forecast", required_argument, nullptr, 'l'},
+        {"store-screen", required_argument, nullptr, 'p'},
+        {},
+    };
 
     Options options_used{};
 
@@ -100,6 +102,10 @@ int run(const Options &options) {
     /* For now, simply bail if we're in dry run mode */
     if (DRY_RUN) { exit(0); }
 
+    /* TODO: Create a safe method of sleeping for a configurable amount of time
+     * and then fetch new data, and write to screen */
+
+    /* If not using dry-run, then write "screen" content to the display */
     using namespace std::literals::chrono_literals;
     fmt::print("Running\n");
 

@@ -116,6 +116,7 @@ struct weather {
     }
 
     json fetch_forecast() {
+        // TODO: Read longtidue and latitude from some kind of settings file
         const std::string longitude = "13.18120";
         const std::string latitude = "55.70487";
         const std::string url = fmt::format(

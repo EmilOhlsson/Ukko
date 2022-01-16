@@ -54,6 +54,7 @@ class Screen {
     Screen(const std::optional<std::string> &filename) : filename(filename) {}
 
     void draw(const std::vector<weather::Hour> &dps) {
+        /* TODO: Screen might already have content, so start by clearing screen */
         context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
 
         /* number of samples, limit to coming 12 h */
