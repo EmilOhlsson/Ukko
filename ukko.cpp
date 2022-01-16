@@ -25,20 +25,19 @@ int run(const Options &);
 int main(int argc, char **argv) {
     int c;
 
-    const static option options_available[] = {
-        {"dry-run", no_argument, nullptr, 'd'},
-        {"verbose", no_argument, nullptr, 'v'},
-        {"help", no_argument, nullptr, 'h'},
-        {"store-forecast", required_argument, nullptr, 's'},
-        {"load-forecast", required_argument, nullptr, 'l'},
-        {"store-screen", required_argument, nullptr, 'p'},
-    };
+    const static option options_available[] = {{"dry-run", no_argument, nullptr, 'd'},
+                                               {"verbose", no_argument, nullptr, 'v'},
+                                               {"help", no_argument, nullptr, 'h'},
+                                               {"store-forecast", required_argument, nullptr, 's'},
+                                               {"load-forecast", required_argument, nullptr, 'l'},
+                                               {"store-screen", required_argument, nullptr, 'p'},
+                                               {}};
 
     Options options_used{};
 
     while (true) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "dhvs:l:p:", options_available, &option_index);
+        c = getopt_long(argc, argv, "dhvs:l:p:", &options_available[0], &option_index);
         if (c == -1) { break; }
 
         switch (c) {
@@ -50,6 +49,7 @@ int main(int argc, char **argv) {
                 fmt::print("Using verbose mode\n");
                 break;
 
+            default:
             case 'h':
                 fmt::print("Usage: ukko [flags]\n");
                 fmt::print(" -d | --dry-run                Do now write to HW interfaces\n");
@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
                 fmt::print(
                     " -s | --store-forecast <file>  Store forecast data to json formatted file\n");
                 fmt::print(" -p | --store-scrren <file>    Store screen as image file\n");
-                exit(0);
+                exit(c != 'h');
 
             case 's':
                 fmt::print("Store forecast data to {}\n", optarg);

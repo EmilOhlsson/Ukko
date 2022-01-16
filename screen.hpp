@@ -6,8 +6,12 @@
 #include <cairommconfig.h>
 #include <fmt/core.h>
 
-#include "weather.hpp"
+#include <algorithm>
+#include <iterator>
+#include <ranges>
+
 #include "utils.hpp"
+#include "weather.hpp"
 
 class Screen {
     static constexpr int WIDTH = 800;
@@ -23,11 +27,28 @@ class Screen {
     /* Filename to store image in */
     const std::optional<std::string> &filename;
 
-    template<typename T>
-    constexpr T diff(T v1, T v2) {
-        if (v1 > v2) return v1 - v2;
-        else return v2 - v1;
-    }
+    /**
+     * Representation of range from low to high value
+     * */
+    struct Range {
+        Range(double lo, double hi) : lo(lo), hi(hi) {}
+        double lo;
+        double hi;
+    };
+
+    /**
+     * Conversion object from one linear range to another.
+     */
+    class Conv {
+        double scale;
+        double offset;
+
+      public:
+        Conv(Range src, Range dst)
+            : scale((dst.hi - dst.lo) / (src.hi - src.lo)), offset(dst.lo - src.lo * scale) {}
+
+        double operator()(double v) const { return v * scale + offset; }
+    };
 
   public:
     Screen(const std::optional<std::string> &filename) : filename(filename) {}
@@ -35,39 +56,25 @@ class Screen {
     void draw(const std::vector<weather::Hour> &dps) {
         context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
 
-        /* number of samples */
+        /* number of samples, limit to coming 12 h */
         const size_t samples = std::min<size_t>(dps.size(), 12);
 
-        // TODO Encapsulate this block here to allow const max and min
-        double min = std::numeric_limits<double>::max();
-        double max = std::numeric_limits<double>::min();
-        for (size_t i = 0; i < samples; i++) {
-            max = std::max<double>(dps[i].temperature, max);
-            min = std::min<double>(dps[i].temperature, min);
-        }
+        /* Relavant temperature range */
+        const auto &get_temp = [](const weather::Hour &dp) -> double { return dp.temperature; };
+        const auto temperatures = dps | std::views::take(samples) | std::views::transform(get_temp);
+        const auto [minp, maxp] = std::ranges::minmax_element(temperatures);
+        const Range temperature_range(*minp, *maxp);
 
         /* Limit graph area */
-        const double temp_width = 50;
-        const double graph_width = WIDTH - temp_width;
-        const double graph_height = HEIGHT * 0.9;
-        const double graph_x_offset = temp_width;
-        const double graph_y_offset = HEIGHT / 20.0;
+        const double graph_x_offset = 50;
+        const double graph_width = WIDTH - graph_x_offset;
+        const double graph_y_offset = 30;
+        const Range graph_y_range(HEIGHT - graph_y_offset, graph_y_offset);
 
         const double steps = samples - 1;
         const double step_size = graph_width / steps;
 
-        const auto &temperature_to_y = [&](double temperature) -> double {
-            const double norm_div = max - min;
-            const double vertical_span = graph_height - 2 * 48;
-            const double scale = vertical_span / norm_div;
-            const double offset = 48 - min * scale;
-
-            return graph_height - (temperature * scale + offset) - 1;
-        };
-        
-        /* TODO: For now, just ignore the netatmo data, we only want the forecast */
-
-        /* TODO: Grading, there should never be more than 7-9 lines. If range is including, or
+        /* Grading: there should never be more than 7-9 lines. If range is including, or
          * "close" to zero, there should be a zero line. (Close meaning wihin 1°C of zero)
          *
          * lines should never be closer than 1°C, and not more than 5°C
@@ -75,14 +82,14 @@ class Screen {
          * left of line there are values written
          */
 
-        bool use_zero_line = (max > 0 && min < 0) || diff(0.0, min) < 1.0 || diff(0.0, max) < 1.0;
-
-        /* If temperature resolution is higher than 100°C we have a problem... */
-        double block_size = 0;
-        double blocks = 0;
-        const double span = max - min;
-        constexpr double max_blocks = 7;
-        for (const double bsize : {1,2,5,10,20,50,100}) {
+        /* Calcluate reasonable resolution for graph. If resolution gives too many temperature
+         * lines, then reduce temperature until scale works. If temperature resolution need to be
+         * higher than 100°C we have a problem... */
+        int block_size = 0;
+        int blocks = 0;
+        const int span = std::ceil(temperature_range.hi - temperature_range.lo);
+        constexpr int max_blocks = 7;
+        for (const int bsize : {1, 2, 5, 10, 20, 50, 100}) {
             blocks = utils::div_ceil(span, bsize);
             if (blocks < max_blocks) {
                 block_size = bsize;
@@ -92,59 +99,56 @@ class Screen {
         assert(block_size > 0);
 
         /* Calculate a lower line, i.e, min value rounded down to multiple of block size */
-        double lower = utils::round_down(min, block_size);
+        const Range input_range(
+            utils::round_down<int>(std::floor(temperature_range.lo), block_size),
+            utils::round_up<int>(std::ceil(temperature_range.hi), block_size));
 
-        /* Calculate a upper line, i.e, max value rounded up to multiple of block size */
-        double upper = utils::round_up(max, block_size);
+        /* Conversion object that maps input temperature range, to screen pixels */
+        const Conv conv{input_range, graph_y_range};
 
-        double drawn_span = upper - lower;
-        
-        /* TODO: Use these to draw graph lines, and write scale to the left */
-        const auto &val_to_y = [&](double val, double norm) -> double {
-            return HEIGHT - 
-        };
+        /* Draw the levels, and annotate them */
+        for (int l = input_range.lo; l <= input_range.hi; l++) {
+            if (l == 0) {
+                /* Make zero line stand out */
+                context->set_line_width(2);
+                context->unset_dash();
+            } else {
+                context->set_line_width(1);
+                context->set_dash(std::vector{1.0, 5.0}, 0.0);
+            }
+            context->move_to(graph_x_offset, conv(l));
+            context->rel_line_to(graph_width, 0);
+            context->stroke();
 
+            /* Print temperature */
+            context->move_to(10, conv(l));
+            context->show_text(fmt::format("{}°C", l));
+            context->stroke();
+        }
 
+        /* Draw timestamps below graph */
+        double clock_x = graph_x_offset;
+        const auto get_time = [](const auto &dp) { return dp.time; };
+        const auto timestamps =
+            dps | std::views::take(samples - 1) | std::views::transform(get_time);
+        constexpr double clock_y = HEIGHT - 10;
+        for (const auto &timestamp : timestamps) {
+            context->move_to(clock_x, clock_y);
+            context->show_text(fmt::format("{:%H:%M}", timestamp));
+            context->stroke();
+            clock_x += step_size;
+        }
 
-        
-        /* TODO: We want to have some space available above and below to print labels and extra
-         * information */
-
-        /* Zero line */
-        context->set_line_width(2.0);
-        context->move_to(0, temperature_to_y(0));
-        context->line_to(graph_width - 1, temperature_to_y(0));
-        context->stroke();
-
-        /* -1 */
-        context->set_line_width(1.0);
-        context->set_dash(std::vector{1.0,5.0},0.0);
-        context->move_to(0, temperature_to_y(-1));
-        context->line_to(graph_width - 1, temperature_to_y(-1));
-        context->stroke();
-
-        /* Temperature curve */
+        /* Draw temperature curve */
         context->set_line_width(4.0);
         context->unset_dash();
-        context->move_to(0, temperature_to_y(dps[0].temperature));
-        for (size_t i = 1; i < samples; i++) {
-            fmt::print(" Drawing {} as at {}\n", dps[i].temperature, temperature_to_y(dps[i].temperature));
-            context->line_to(step_size * i, temperature_to_y(dps[i].temperature));
+        double graph_x = graph_x_offset;
+        context->move_to(graph_x, conv(dps[0].temperature));
+        for (const auto temperature : temperatures | std::views::drop(1)) {
+            context->line_to(graph_x += step_size, conv(temperature));
         }
         context->stroke();
 
-        /* Some text */
-        context->set_line_width(1.0);
-        context->set_font_size(10.0); /* Default size is 10.0 */
-        context->move_to(WIDTH / 2.0, HEIGHT / 2.0);
-        context->show_text("Hello, world");
-        context->stroke();
-        context->move_to(WIDTH / 2.0, HEIGHT / 2.0);
-        context->line_to(0,0);
-        context->stroke();
-
-        if (filename) {
-            surface->write_to_png(*filename);
-        }
+        if (filename) { surface->write_to_png(*filename); }
     }
 };
