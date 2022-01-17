@@ -159,4 +159,8 @@ class Screen {
             surface->write_to_png(*filename);
         }
     }
+
+    const uint8_t *get_ptr() {
+        return surface->get_data();
+    }
 };

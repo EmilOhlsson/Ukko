@@ -126,7 +126,8 @@ int run(const Options &options) {
         fmt::print("buffer size is: {}\n", buffer.size());
         display.clear();
         std::this_thread::sleep_for(500ms);
-        display.set_fb(buffer.data(), buffer.size());
+        // display.set_fb(buffer.data(), buffer.size());
+        display.render(screen.get_ptr());
         fmt::print("Drawing framebuffer\n");
         display.clear();
         std::this_thread::sleep_for(500ms);

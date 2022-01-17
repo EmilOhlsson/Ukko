@@ -136,6 +136,11 @@ struct Display {
         }
     }
 
+    // TODO temporary
+    void render(const uint8_t *data) {
+        memcpy(fb.data(), data, width_bytes * height);
+    }
+
   private:
     hwif::Hwif &hwif;
     static constexpr uint32_t bpb = 8; // Bits per byte
