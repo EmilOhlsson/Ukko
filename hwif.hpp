@@ -11,6 +11,7 @@
 #include <thread>
 #include <vector>
 
+#include "common.hpp"
 #include "gpio.hpp"
 
 namespace hwif {
@@ -36,11 +37,11 @@ enum class Command : uint8_t {
     DisplayStartTransmission2 = 0x13,
     DualSPI = 0x15,
     AutoSequence = 17,
-    LutVcom = 0x20,  // Is this really on v2?
-    LutBlue = 0x21,  // Is this really on v2?
-    LutWhite = 0x22, // Is this really on v2?
-    LutGray1 = 0x23, // Is this really on v2?
-    LutGray2 = 0x23, // Is this really on v2?
+    LutVcom = 0x20,
+    LutBlue = 0x21,
+    LutWhite = 0x22,
+    LutGray1 = 0x23,
+    LutGray2 = 0x23,
     KWLUOption = 0x2B,
     PLLControl = 0x30,
     TemperatureSensorCalibration = 0x40,
@@ -74,12 +75,13 @@ enum class Command : uint8_t {
 };
 
 struct Hwif {
-    Hwif(std::string_view device, Pins &pins) : pins(pins) {
+    Hwif(const Options &options, std::string_view device, Pins &pins)
+        : pins(pins), options(options) {
         // Open File O_RDWR
         // uint8_t bits = 8;
         // ioctl(fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
         // Check DEV_HARDWARE_SPI_begin()
-        fd = std::make_unique<File>(device, O_RDWR | O_SYNC);
+        fd = options.is_dry() ? nullptr : std::make_unique<File>(device, O_RDWR | O_SYNC);
 
         set_mode(SPI_MODE_0);
         set_chip_select(CS_Mode::Low);
@@ -88,14 +90,25 @@ struct Hwif {
         set_interval(0);
     }
 
-    template <typename T> void send(Command cmd, T data) { send(static_cast<uint8_t>(cmd), data); }
-    void send(Command cmd, std::span<uint8_t> data) { send(static_cast<uint8_t>(cmd), data); }
+    template <typename T> void send(Command cmd, T data) {
+        send(static_cast<uint8_t>(cmd), data);
+    }
+
+    void send(Command cmd, std::span<uint8_t> data) {
+        send(static_cast<uint8_t>(cmd), data);
+    }
+
     void send(Command cmd, std::initializer_list<uint8_t> data) {
         send(static_cast<uint8_t>(cmd), data);
     }
-    void send(Command cmd) { send(static_cast<uint8_t>(cmd)); }
+
+    void send(Command cmd) {
+        send(static_cast<uint8_t>(cmd));
+    }
 
     void reset() {
+        fmt::print("Resetting screen\n");
+
         using namespace std::literals::chrono_literals;
         pins.reset.deactive();
         std::this_thread::sleep_for(20ms);
@@ -105,18 +118,21 @@ struct Hwif {
         std::this_thread::sleep_for(20ms);
     }
 
-    void wait_for_idle() { pins.busy.wfi(); }
+    void wait_for_idle() {
+        if (options.is_dry()) {
+            return;
+        }
+        pins.busy.wfi();
+    }
 
   private:
     void send(uint8_t cmd, std::span<uint8_t> data) {
         send(cmd);
-        fmt::print("HAI!\n");
         transfer(data.data(), data.size());
     }
 
     void send(uint8_t cmd, std::initializer_list<uint8_t> data) {
         send(cmd);
-        fmt::print("IHA!\n");
         transfer(data.begin(), data.size());
     }
 
@@ -133,6 +149,10 @@ struct Hwif {
     void transfer(const uint8_t *data, size_t size) {
         std::vector<uint8_t> buffer(data, data + size);
         fmt::print("  writing {}\n", buffer);
+
+        if (options.is_dry()) {
+            return;
+        }
         // if (write(*fd, data, size) < 0) {
         //     throw std::runtime_error(
         //         fmt::format("Unable to write data to SPI: {}", strerror(errno)));
@@ -184,6 +204,11 @@ struct Hwif {
     }
 
     void set_speed(uint32_t speed) {
+        if (options.is_dry()) {
+            fmt::print("Setting speed to {}\n", speed);
+            return;
+        }
+
         if (ioctl(*fd, SPI_IOC_WR_MAX_SPEED_HZ, &speed) < 0) {
             throw std::runtime_error(fmt::format("Unable to set write speed: {}", strerror(errno)));
         }
@@ -194,6 +219,11 @@ struct Hwif {
 
     // TODO: The functions below can be merged to pretty much one IOCTL
     void set_bits_per_word() {
+        if (options.is_dry()) {
+            fmt::print("Setting bits per word\n");
+            return;
+        }
+
         uint8_t bits = 8;
         if (ioctl(*fd, SPI_IOC_WR_BITS_PER_WORD, &bits) < 0) {
             throw std::runtime_error(
@@ -207,6 +237,11 @@ struct Hwif {
     }
 
     void set_mode(int mode) {
+        if (options.is_dry()) {
+            fmt::print("Setting mode {}\n", mode);
+            return;
+        }
+
         m_mode &= 0xFC;
         m_mode |= mode;
         if (ioctl(*fd, SPI_IOC_WR_MODE, &m_mode) < 0) {
@@ -220,6 +255,11 @@ struct Hwif {
     };
 
     void set_chip_select(CS_Mode mode) {
+        if (options.is_dry()) {
+            fmt::print("Setting CSmode\n");
+            return;
+        }
+
         switch (mode) {
             case CS_Mode::High: {
                 m_mode |= SPI_CS_HIGH;
@@ -263,6 +303,11 @@ struct Hwif {
     };
 
     void set_bus_mode(BusMode mode) {
+        if (options.is_dry()) {
+            fmt::print("Setting bus mode\n");
+            return;
+        }
+
         switch (mode) {
             case BusMode::ThreeWire:
                 m_mode |= SPI_3WIRE;
@@ -277,13 +322,22 @@ struct Hwif {
         }
     }
 
-    void set_interval(uint16_t us) { tr.delay_usecs = us; }
+    void set_interval(uint16_t us) {
+        if (options.is_dry()) {
+            fmt::print("Setting interval\n");
+            return;
+        }
+
+        tr.delay_usecs = us;
+    }
 
     Pins &pins;
 
     std::unique_ptr<File> fd;
     spi_ioc_transfer tr;
     uint16_t m_mode = 0;
+
+    const Options &options;
 };
 
 } // namespace hwif

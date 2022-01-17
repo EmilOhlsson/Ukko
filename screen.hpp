@@ -31,7 +31,8 @@ class Screen {
      * Representation of range from low to high value
      * */
     struct Range {
-        Range(double lo, double hi) : lo(lo), hi(hi) {}
+        Range(double lo, double hi) : lo(lo), hi(hi) {
+        }
         double lo;
         double hi;
     };
@@ -45,13 +46,17 @@ class Screen {
 
       public:
         Conv(Range src, Range dst)
-            : scale((dst.hi - dst.lo) / (src.hi - src.lo)), offset(dst.lo - src.lo * scale) {}
+            : scale((dst.hi - dst.lo) / (src.hi - src.lo)), offset(dst.lo - src.lo * scale) {
+        }
 
-        double operator()(double v) const { return v * scale + offset; }
+        double operator()(double v) const {
+            return v * scale + offset;
+        }
     };
 
   public:
-    Screen(const std::optional<std::string> &filename) : filename(filename) {}
+    Screen(const std::optional<std::string> &filename) : filename(filename) {
+    }
 
     void draw(const std::vector<weather::Hour> &dps) {
         /* TODO: Screen might already have content, so start by clearing screen */
@@ -150,6 +155,8 @@ class Screen {
         }
         context->stroke();
 
-        if (filename) { surface->write_to_png(*filename); }
+        if (filename) {
+            surface->write_to_png(*filename);
+        }
     }
 };

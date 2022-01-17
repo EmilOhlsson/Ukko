@@ -4,7 +4,8 @@
 
 void do_curl_stuff() {
     CURL *curl = curl_easy_init();
-    if (!curl) throw std::runtime_error("Could not initialize curl");
+    if (!curl)
+        throw std::runtime_error("Could not initialize curl");
 
     char errbuf[CURL_ERROR_SIZE];
 
@@ -18,7 +19,8 @@ void do_curl_stuff() {
     // curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, forecast_file);
     int err = curl_easy_perform(curl);
-    if (err) fmt::print("Got cURL error: {}", errbuf);
+    if (err)
+        fmt::print("Got cURL error: {}", errbuf);
 
     curl_easy_cleanup(curl);
 }

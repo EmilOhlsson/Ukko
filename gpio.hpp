@@ -8,6 +8,7 @@
 //#include <gpiod.h>
 #include <gpiod.hpp>
 
+#include "common.hpp"
 #include "file.hpp"
 
 namespace gpio {
@@ -25,7 +26,11 @@ struct Output {
     //     Output &gpio;
     // };
 
-    Output(Active level, uint32_t pin) : level(level), pin(pin) {
+    Output(const Options &options, Active level, uint32_t pin)
+        : level(level), pin(pin), options(options) {
+        if (options.is_dry()) {
+            return;
+        }
         // TODO: use GPIOD
         using namespace std::literals::chrono_literals;
         /* If GPIO already is exported, check if it's configured as output. If it's not already
@@ -48,6 +53,10 @@ struct Output {
     }
 
     ~Output() {
+        if (options.is_dry()) {
+            return;
+        }
+
         /* Ground output before removing */
         write(*output, "0", 1);
         output.reset(nullptr);
@@ -57,8 +66,12 @@ struct Output {
     // ActiveScope keep_active() { return ActiveScope(*this); }
 
     void activate() {
-        // if (activation_count == 0) {
         fmt::print("   Activating {}\n", pin);
+        if (options.is_dry()) {
+            return;
+        }
+
+        // if (activation_count == 0) {
         output->write(level == Active::Low ? "0" : "1");
         // write(*output, level == Active::Low ? "0" : "1", 1);
         //} else {
@@ -68,9 +81,12 @@ struct Output {
     }
 
     void deactive() {
+        fmt::print("   Deactivating {}\n", pin);
+        if (options.is_dry()) {
+            return;
+        }
         // activation_count = std::min<uint32_t>(activation_count - 1, 0);
         // if (--activation_count == 0) {
-        fmt::print("   Deactivating {}\n", pin);
         // write(*output, level == Active::Low ? "1" : "0", 1);
         output->write(level == Active::Low ? "1" : "0");
         //} else {
@@ -85,10 +101,11 @@ struct Output {
     uint32_t activation_count = 0;
     std::unique_ptr<File> output;
     static constexpr std::string_view gpio_dir = "/sys/class/gpio";
+    const Options &options;
 };
 
 struct Input {
-    Input(uint32_t pin) {
+    Input(const Options &options, uint32_t pin) : options(options) {
         //    using namespace std::literals::chrono_literals;
         // fmt::print("   Exporting input pin {}\n", pin);
         // if (std::filesystem::exists(fmt::format("{}/gpio{}", gpio_dir, pin))) {
@@ -124,24 +141,37 @@ struct Input {
     }
 
     void wfi() {
+        // TODO: Use C++ API instead
+        // TODO: Make sure there is timeout on the interrupt awaiting
+
+        fmt::print("Awaiting interrupt\n");
+        if (options.is_dry()) {
+            return;
+        }
+
         using namespace std::literals::chrono_literals;
         chip = gpiod_chip_open_by_name("gpiochip0");
-        if (!chip) throw std::runtime_error("Unable to open gpio chip");
+        if (!chip)
+            throw std::runtime_error("Unable to open gpio chip");
 
         line = gpiod_chip_get_line(chip, 24);
-        if (!line) throw std::runtime_error("Unable to open gpio line");
+        if (!line)
+            throw std::runtime_error("Unable to open gpio line");
 
         int ret = gpiod_line_request_rising_edge_events(line, "Consumer");
-        if (ret < 0) throw std::runtime_error("Unable to expect event");
+        if (ret < 0)
+            throw std::runtime_error("Unable to expect event");
 
         auto await = [&]() -> int {
             fmt::print("Awaiting event\n");
             int ret = gpiod_line_event_wait(line, nullptr);
-            if (ret < 0) throw std::runtime_error("Couldn't await :-(");
+            if (ret < 0)
+                throw std::runtime_error("Couldn't await :-(");
 
             gpiod_line_event event;
             ret = gpiod_line_event_read(line, &event);
-            if (ret < 0) throw std::runtime_error("couldn't read event");
+            if (ret < 0)
+                throw std::runtime_error("couldn't read event");
             return 0;
         };
 
@@ -211,6 +241,8 @@ struct Input {
     gpiod_line *line;
     std::unique_ptr<File> input;
     static constexpr std::string_view gpio_dir = "/sys/class/gpio";
+
+    const Options &options;
 };
 
 } // namespace gpio

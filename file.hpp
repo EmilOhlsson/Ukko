@@ -40,9 +40,13 @@ struct File {
         }
     }
 
-    void write(std::string_view data) { write(std::span(data)); }
+    void write(std::string_view data) {
+        write(std::span(data));
+    }
 
-    operator int() const { return fd; }
+    operator int() const {
+        return fd;
+    }
 
   private:
     int fd;

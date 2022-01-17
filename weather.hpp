@@ -28,9 +28,11 @@ struct weather {
 
     weather(std::optional<std::string> load_forecast = std::nullopt,
             std::optional<std::string> store_forecast = std::nullopt)
-        : load_file(load_forecast), store_file(store_forecast) {}
+        : load_file(load_forecast), store_file(store_forecast) {
+    }
 
-    ~weather() {}
+    ~weather() {
+    }
 
     std::vector<Hour> retrieve() {
         json weather;
@@ -40,10 +42,14 @@ struct weather {
             weather = fetch_forecast();
         }
 
-        if (store_file) { store_forecast(*store_file, weather); }
+        if (store_file) {
+            store_forecast(*store_file, weather);
+        }
 
         assert(weather.is_object());
-        for (auto &[key, value] : weather.items()) { fmt::print("Key: {}\n", key); }
+        for (auto &[key, value] : weather.items()) {
+            fmt::print("Key: {}\n", key);
+        }
 
         fmt::print("Got time: {}\n", weather["referenceTime"]);
         fmt::print("Valid time: {}\n", to_string(weather["timeSeries"][0]["validTime"]));

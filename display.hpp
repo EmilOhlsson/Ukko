@@ -8,7 +8,8 @@
 #include "utils.hpp"
 
 struct Display {
-    Display(hwif::Hwif &hwif) : hwif(hwif) {}
+    Display(hwif::Hwif &hwif) : hwif(hwif) {
+    }
 
     // TODO, this might make more sense to have in hwif
     void init() {
