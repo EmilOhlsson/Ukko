@@ -15,9 +15,6 @@
  */
 struct File {
     File(std::string_view filename, int flags) {
-        fmt::print("Opening {}\n", filename);
-        // TODO: It might be that we want to use some flags here
-        // TODO: Adding a delay here seem to solve problems...
         fd = ::open(filename.data(), flags);
         if (fd < 0) {
             throw std::runtime_error(
@@ -27,15 +24,12 @@ struct File {
     }
 
     ~File() {
-        fmt::print("Closing {}\n", filename);
         close(fd);
     }
 
     template <typename T> void write(std::span<T> data) {
-        fmt::print("GPIO: Writing {} to {}\n", data, filename);
         ssize_t result = ::write(fd, data.data(), sizeof(T) * data.size());
         if (result < 0) {
-            // TODO it might be that we need some gracious handling here
             throw std::runtime_error(fmt::format("Error writing: {}", strerror(errno)));
         }
     }

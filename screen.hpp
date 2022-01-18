@@ -24,6 +24,9 @@ class Screen {
     Cairo::RefPtr<Cairo::ImageSurface> surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
     Cairo::RefPtr<Cairo::Context> context = Cairo::Context::create(surface);
 
+    const Options &options;
+    const Logger log = options.get_logger(Logger::Facility::Screen);
+
     /* Filename to store image in */
     const std::optional<std::string> &filename;
 
@@ -55,12 +58,14 @@ class Screen {
     };
 
   public:
-    Screen(const std::optional<std::string> &filename) : filename(filename) {
+    Screen(const Options &options) : options(options), filename(options.render_store) {
+        context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
     }
 
     void draw(const std::vector<weather::Hour> &dps) {
-        /* TODO: Screen might already have content, so start by clearing screen */
-        context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
+        log("Drawing data points to screen");
+        surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
+        context = Cairo::Context::create(surface);
 
         /* number of samples, limit to coming 12 h */
         const size_t samples = std::min<size_t>(dps.size(), 12);
@@ -85,8 +90,7 @@ class Screen {
          *
          * lines should never be closer than 1°C, and not more than 5°C
          *
-         * left of line there are values written
-         */
+         * left of line there are values written */
 
         /* Calcluate reasonable resolution for graph. If resolution gives too many temperature
          * lines, then reduce temperature until scale works. If temperature resolution need to be
@@ -156,11 +160,13 @@ class Screen {
         context->stroke();
 
         if (filename) {
-            surface->write_to_png(*filename);
+            surface->write_to_png(fmt::format("{}-{}.png", *filename, render_number));
+            render_number += 1;
         }
     }
 
     std::span<uint8_t, IMG_SIZE> get_ptr() {
         return std::span<uint8_t, IMG_SIZE>{surface->get_data(), IMG_SIZE};
     }
+    uint32_t render_number = 0;
 };

@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "common.hpp"
 #include "nlohmann/json.hpp"
 
 struct weather {
@@ -26,9 +27,8 @@ struct weather {
         double gusts;
     };
 
-    weather(std::optional<std::string> load_forecast = std::nullopt,
-            std::optional<std::string> store_forecast = std::nullopt)
-        : load_file(load_forecast), store_file(store_forecast) {
+    weather(const Options &options)
+        : options(options), load_file(options.forecast_load), store_file(options.forecast_store) {
     }
 
     ~weather() {
@@ -47,28 +47,6 @@ struct weather {
         }
 
         assert(weather.is_object());
-        for (auto &[key, value] : weather.items()) {
-            fmt::print("Key: {}\n", key);
-        }
-
-        fmt::print("Got time: {}\n", weather["referenceTime"]);
-        fmt::print("Valid time: {}\n", to_string(weather["timeSeries"][0]["validTime"]));
-        fmt::print("Temperature: {}\n",
-                   to_string(weather["timeSeries"][0]["parameters"][1]["values"][0]));
-
-        std::tm ref_time{};
-        char *res =
-            strptime(weather["referenceTime"].get<std::string>().c_str(), "%FT%TZ", &ref_time);
-        if (res == nullptr) {
-            fmt::print("Unable to parse date from {}\n",
-                       to_string(weather["referenceTime"]).c_str());
-        } else if (*res != '\0') {
-            fmt::print("Stopped parsing at: {}\n", res);
-        }
-        // std::istringstream is {to_string(weather["referenceTime"])};
-
-        // is >> std::get_time(&ref_time, "%FT%TZ");
-        fmt::print("Date: {:%Y-%m-%d %H:%M:%S}\n", ref_time);
 
         std::vector<Hour> hours{};
         for (auto &dp : weather["timeSeries"]) {
@@ -96,28 +74,36 @@ struct weather {
         }
 
         for (const auto &dp : hours) {
-            fmt::print("at {:%H:%M}: {:2}°C\n", dp.time, dp.temperature);
+            log("at {:%H:%M}: {:2}°C", dp.time, dp.temperature);
         }
         this->hours = hours;
         return hours;
     }
 
   private:
+    static constexpr std::string_view log_name = "Weather";
+    const Options &options;
+    const Logger log = options.get_logger(Logger::Facility::Weather);
     std::optional<std::string> load_file{};
     std::optional<std::string> store_file{};
+
+    uint32_t load_index{};
+    uint32_t store_index{};
 
     char errbuf[CURL_ERROR_SIZE]{};
     std::vector<Hour> hours{};
 
     json load_forecast(const std::string &filename) {
-        std::ifstream input{filename};
+        std::ifstream input{fmt::format("{}-{}.json", filename, load_index)};
+        load_index += 1;
         json result;
         input >> result;
         return result;
     }
 
     void store_forecast(const std::string &filename, const json &j) {
-        std::ofstream out{filename};
+        std::ofstream out{fmt::format("{}-{}.json", filename, store_index)};
+        store_index += 1;
         out << std::setw(4) << j << std::endl;
     }
 
