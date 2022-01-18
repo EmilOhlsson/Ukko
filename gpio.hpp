@@ -83,6 +83,7 @@ struct Output {
     void deactive() {
         fmt::print("   Deactivating {}\n", pin);
         if (options.is_dry()) {
+            fmt::print("(no, not really deactivating\n");
             return;
         }
         // activation_count = std::min<uint32_t>(activation_count - 1, 0);

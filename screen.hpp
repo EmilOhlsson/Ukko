@@ -10,12 +10,11 @@
 #include <iterator>
 #include <ranges>
 
+#include "common.hpp"
 #include "utils.hpp"
 #include "weather.hpp"
 
 class Screen {
-    static constexpr int WIDTH = 800;
-    static constexpr int HEIGHT = 480;
     static constexpr Cairo::Format FORMAT = Cairo::Format::FORMAT_A1;
 
     /* It's worth pointing out that using the A1 format then only alpha channel

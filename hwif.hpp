@@ -4,6 +4,7 @@
 #include <fmt/ranges.h>
 #include <linux/spi/spidev.h>
 #include <linux/types.h>
+#include <ranges>
 #include <span>
 #include <string.h>
 #include <string_view>
@@ -148,7 +149,7 @@ struct Hwif {
 
     void transfer(const uint8_t *data, size_t size) {
         std::vector<uint8_t> buffer(data, data + size);
-        fmt::print("  writing {}\n", buffer);
+        fmt::print("  writing {}\n", buffer | std::views::take(16));
 
         if (options.is_dry()) {
             return;

@@ -3,6 +3,8 @@
 #include <optional>
 #include <string>
 
+#include "utils.hpp"
+
 enum class RunMode {
     Normal,
     Dry,
@@ -19,3 +21,9 @@ struct Options {
         return run_mode == RunMode::Dry;
     }
 };
+
+/* We're assuming A1 format, monochrome */
+static constexpr uint32_t WIDTH = 800;
+static constexpr uint32_t STRIDE = utils::div_ceil<uint32_t>(WIDTH, 8);
+static constexpr uint32_t HEIGHT = 480;
+static constexpr uint32_t IMG_SIZE = WIDTH * STRIDE;

@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <cairomm/surface.h>
+#include <fmt/os.h>
 
 #include "hwif.hpp"
 #include "utils.hpp"
@@ -84,11 +85,12 @@ struct Display {
 
     void clear() {
         using namespace hwif;
-        std::ranges::fill(fb, 0xFF);
-        hwif.send(Command::DisplayStartTransmission1, fb); // Display start transmission
-        std::ranges::fill(fb, 0x00);
+        std::vector<uint8_t> buffer = std::vector<uint8_t>(IMG_SIZE);
+        std::ranges::fill(buffer, 0xFF);
+        hwif.send(Command::DisplayStartTransmission1, buffer); // Display start transmission
+        std::ranges::fill(buffer, 0x00);
         fmt::print(" Writing clear\n");
-        hwif.send(Command::DisplayStartTransmission2, fb); // Display start transmission2
+        hwif.send(Command::DisplayStartTransmission2, buffer); // Display start transmission2
         turn_on_display();
     }
 
@@ -113,41 +115,60 @@ struct Display {
     void draw_fb() {
         using namespace hwif;
         fmt::print(" Drawing framebuffer\n");
-        std::vector<uint8_t> buffer(800 * 480);
-        std::ranges::fill(buffer, 0x99);
-        hwif.send(hwif::Command::DisplayStartTransmission2, buffer);
+        // std::vector<uint8_t> buffer(800 * 480);
+        // std::ranges::fill(buffer, 0x99);
+        //  TODO: This sends more data than should probably be needed.
+        // hwif.send(hwif::Command::DisplayStartTransmission2, buffer);
+        hwif.send(hwif::Command::DisplayStartTransmission2, fb);
         turn_on_display();
-    }
 
-    /**
-     * Draw data to frame buffer
-     */
-    void set_fb(const uint8_t *data, size_t size) {
-        // TODO THIS HAS A BUG!!!!!!
-        assert(size <= width * height);
-        assert(size % bpb == 0);
-        for (uint32_t i = 0; i < size; i += 8) {
-            uint8_t page = 0;
-            for (uint32_t px = 0; px < bpb; px += 1) {
-                page <<= 1;
-                page |= data[i + px] ? 1 : 0;
+        for (uint32_t i = 0; i < IMG_SIZE; i++) {
+            if (fb[i] != 0) {
+                fmt::print("Drawing: set bit at {}\n", i);
             }
-            fb[i / bpb] = page;
+        }
+        // TODO: Render to ppm file for viewing
+        auto out = fmt::output_file("fb.ppm");
+        out.print("P1\n");
+        out.print("{} {}\n", 800, 480);
+
+        for (uint32_t row = 0; row < HEIGHT; row++) {
+            for (uint32_t col = 0; col < STRIDE; col++) {
+                for (uint32_t bit = 0; bit < 8; bit++) {
+                    uint8_t byte = fb[row * STRIDE + col];
+                    out.print("{} ", (byte >> bit) & 1);
+                }
+            }
+            out.print("\n");
         }
     }
 
+    ///**
+    // * Draw data to frame buffer
+    // */
+    // void set_fb(const uint8_t *data, size_t size) {
+    //    // TODO THIS HAS A BUG!!!!!!
+    //    assert(size <= width * height);
+    //    assert(size % bpb == 0);
+    //    for (uint32_t i = 0; i < size; i += 8) {
+    //        uint8_t page = 0;
+    //        for (uint32_t px = 0; px < bpb; px += 1) {
+    //            page <<= 1;
+    //            page |= data[i + px] ? 1 : 0;
+    //        }
+    //        fb[i / bpb] = page;
+    //    }
+    //}
+
     // TODO temporary
     void render(const uint8_t *data) {
-        memcpy(fb.data(), data, width_bytes * height);
+        assert(fb.size() >= IMG_SIZE);
+        memcpy(&fb[0], data, IMG_SIZE);
     }
 
   private:
     hwif::Hwif &hwif;
-    static constexpr uint32_t bpb = 8; // Bits per byte
-    static constexpr uint32_t width = 800;
-    static constexpr uint32_t width_bytes = utils::div_ceil(width, bpb);
-    static constexpr uint32_t height = 480;
 
     // Frame buffer. Note that each pixel is 1 bit, so each element is 8 pixels
-    std::vector<uint8_t> fb = std::vector<uint8_t>(width_bytes * height);
+    std::vector<uint8_t> fb = std::vector<uint8_t>(IMG_SIZE);
 };
