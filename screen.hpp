@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iterator>
 #include <ranges>
+#include <span>
 
 #include "common.hpp"
 #include "utils.hpp"
@@ -159,7 +160,7 @@ class Screen {
         }
     }
 
-    const uint8_t *get_ptr() {
-        return surface->get_data();
+    std::span<uint8_t, IMG_SIZE> get_ptr() {
+        return std::span<uint8_t, IMG_SIZE>{surface->get_data(), IMG_SIZE};
     }
 };

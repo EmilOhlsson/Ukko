@@ -122,12 +122,12 @@ struct Display {
         hwif.send(hwif::Command::DisplayStartTransmission2, fb);
         turn_on_display();
 
-        for (uint32_t i = 0; i < IMG_SIZE; i++) {
-            if (fb[i] != 0) {
-                fmt::print("Drawing: set bit at {}\n", i);
-            }
-        }
-        // TODO: Render to ppm file for viewing
+        // for (uint32_t i = 0; i < IMG_SIZE; i++) {
+        //     if (fb[i] != 0) {
+        //         fmt::print("Drawing: set bit at {}\n", i);
+        //     }
+        // }
+        //  TODO: Render to ppm file for viewing
         auto out = fmt::output_file("fb.ppm");
         out.print("P1\n");
         out.print("{} {}\n", 800, 480);
@@ -136,7 +136,7 @@ struct Display {
             for (uint32_t col = 0; col < STRIDE; col++) {
                 for (uint32_t bit = 0; bit < 8; bit++) {
                     uint8_t byte = fb[row * STRIDE + col];
-                    out.print("{} ", (byte >> bit) & 1);
+                    out.print("{} ", (byte >> (7 - bit)) & 1);
                 }
             }
             out.print("\n");
@@ -161,9 +161,15 @@ struct Display {
     //}
 
     // TODO temporary
-    void render(const uint8_t *data) {
+    // void render(const uint8_t *data) {
+    void render(const std::span<uint8_t, IMG_SIZE> data) {
         assert(fb.size() >= IMG_SIZE);
-        memcpy(&fb[0], data, IMG_SIZE);
+        std::ranges::transform(data, begin(fb), [](uint8_t byte) {
+            byte = (byte & 0xf0) >> 4 | (byte & ~0xf0) << 4;
+            byte = (byte & 0xcc) >> 2 | (byte & ~0xcc) << 2;
+            byte = (byte & 0xaa) >> 1 | (byte & ~0xaa) << 1;
+            return byte;
+        });
     }
 
   private:
