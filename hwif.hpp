@@ -165,6 +165,10 @@ struct Hwif {
      * Transfer data over SPI by sending it as chunks
      */
     void transfer(const uint8_t *data, size_t size) {
+        if (options.is_dry()) {
+            return;
+        }
+
         std::vector<uint8_t> buffer(data, data + size);
         fmt::print("writing {}\n", buffer | std::views::take(16));
 

@@ -6,9 +6,7 @@
 #include "display.hpp"
 #include "gpio.hpp"
 #include "hwif.hpp"
-#include "net-stuff.hpp"
 #include "screen.hpp"
-#include "something.hpp"
 #include "weather.hpp"
 
 int run(const Options &);

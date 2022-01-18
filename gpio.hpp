@@ -13,95 +13,42 @@
 
 namespace gpio {
 
-enum class Active {
-    Low,
-    High,
+enum class Active : int {
+    Low = 0,
+    High = 1,
 };
 
 struct Output {
-    // struct ActiveScope {
-    //     ActiveScope(Output &gpio) : gpio(gpio) { gpio.activate(); }
-    //     ~ActiveScope() { gpio.deactive(); }
-    //   private:
-    //     Output &gpio;
-    // };
-
-    Output(const Options &options, Active level, uint32_t pin)
-        : level(level), pin(pin), options(options) {
-        if (options.is_dry()) {
-            return;
-        }
-        // TODO: use GPIOD
-        using namespace std::literals::chrono_literals;
-        /* If GPIO already is exported, check if it's configured as output. If it's not already
-         * exported, then export and configure as output */
-        fmt::print("   Exporting pin {}\n", pin);
-        if (std::filesystem::exists(fmt::format("{}/gpio{}", gpio_dir, pin))) {
-            std::ifstream direction_stream(fmt::format("{}/gpio{}/direction", gpio_dir, pin));
-            std::string direction;
-            std::getline(direction_stream, direction);
-            if (direction != "out") {
-                throw std::runtime_error(fmt::format("gpio {} is already as input", pin));
-            }
-        } else {
-            File("/sys/class/gpio/export", O_WRONLY).write(fmt::format("{}", pin));
-            std::this_thread::sleep_for(1s);
-            File(fmt::format("{}/gpio{}/direction", gpio_dir, pin), O_WRONLY).write("out");
-        }
-        output = std::make_unique<File>(fmt::format("{}/gpio{}/value", gpio_dir, pin),
-                                        O_WRONLY | O_SYNC);
-    }
-
-    ~Output() {
+    Output(const Options &options, Active level, uint32_t pin) : level(level), options(options) {
         if (options.is_dry()) {
             return;
         }
 
-        /* Ground output before removing */
-        write(*output, "0", 1);
-        output.reset(nullptr);
-        File("/sys/class/gpio/unexport", O_WRONLY).write(fmt::format("{}", pin));
+        chip = gpiod::chip("gpiochip0");
+        line = chip.get_line(pin);
+        line.set_direction_output(static_cast<int>(level));
     }
-
-    // ActiveScope keep_active() { return ActiveScope(*this); }
 
     void activate() {
-        fmt::print("   Activating {}\n", pin);
         if (options.is_dry()) {
             return;
         }
 
-        // if (activation_count == 0) {
-        output->write(level == Active::Low ? "0" : "1");
-        // write(*output, level == Active::Low ? "0" : "1", 1);
-        //} else {
-        //	fmt::print("   Skipping activation. count is {} for pin {}\n", activation_count, pin);
-        //}
-        // activation_count += 1;
+        line.set_value(static_cast<int>(level));
     }
 
     void deactive() {
-        fmt::print("   Deactivating {}\n", pin);
         if (options.is_dry()) {
-            fmt::print("(no, not really deactivating\n");
             return;
         }
-        // activation_count = std::min<uint32_t>(activation_count - 1, 0);
-        // if (--activation_count == 0) {
-        // write(*output, level == Active::Low ? "1" : "0", 1);
-        output->write(level == Active::Low ? "1" : "0");
-        //} else {
-        //	fmt::print("   Skipping deactivation of pin {}, count is now {}\n", pin,
-        // activation_count);
-        //}
+        line.set_value(!static_cast<int>(level));
     }
 
   private:
+    gpiod::chip chip;
+    gpiod::line line;
+
     Active level;
-    uint32_t pin;
-    uint32_t activation_count = 0;
-    std::unique_ptr<File> output;
-    static constexpr std::string_view gpio_dir = "/sys/class/gpio";
     const Options &options;
 };
 
