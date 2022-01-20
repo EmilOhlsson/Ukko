@@ -76,9 +76,9 @@ enum class Command : uint8_t {
 };
 
 struct Hwif {
-    Hwif(const Options &options, std::string_view device, Pins &pins)
-        : pins(pins), options(options) {
-        fd = options.is_dry() ? nullptr : std::make_unique<File>(device, O_RDWR | O_SYNC);
+    Hwif(const Options &options, Pins &pins) : pins(pins), options(options) {
+        fd = options.is_dry() ? nullptr
+                              : std::make_unique<File>(options.spi_device, O_RDWR | O_SYNC);
 
         set_mode(SPI_MODE_0);
         set_chip_select(ChipSelect::Low);

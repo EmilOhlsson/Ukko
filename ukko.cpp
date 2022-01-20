@@ -82,6 +82,12 @@ int run(const Options &options) {
 
     weather weather{options.forecast_load, options.forecast_store};
     Screen screen{options.screen_store};
+    hwif::Pins control_pins{
+        .reset = gpio::Output(options, gpio::Active::Low, 17, "eink-reset"),
+        .control = gpio::Output(options, gpio::Active::Low, 25, "eink-control"),
+        .busy = gpio::Input(options, 24, "eink-busy"),
+    };
+    hwif::Hwif m_hwif(options, control_pins);
 
     {
         std::vector<weather::Hour> dps = weather.retrieve();
@@ -94,17 +100,10 @@ int run(const Options &options) {
         using namespace std::literals::chrono_literals;
         fmt::print("Running\n");
 
-        hwif::Pins control_pins{
-            .reset = gpio::Output(options, gpio::Active::Low, 17, "eink-reset"),
-            .control = gpio::Output(options, gpio::Active::Low, 25, "eink-control"),
-            .busy = gpio::Input(options, 24, "eink-busy"),
-        };
-
         // TODO make it possible to toggle running on x86, without risking
         // toggling of GPIOs
 
         // TODO: Move out spidevice to above, and keep it open
-        hwif::Hwif m_hwif(options, "/dev/spidev0.0", control_pins);
 
         // TODO: Move out display to above, and keep it open
         Display display(m_hwif);
@@ -113,7 +112,12 @@ int run(const Options &options) {
         fmt::print("Initializing display\n");
         display.init();
         fmt::print("Clearing display\n");
-        display.clear();
+        display.clear(); // <-- This seem to fail, when waiting for event after
+                         //     waiting for !busy after writing {18}, DisplayRefresh
+                         //     And it truly doesn't seem to be done!
+                         //     But if this is run with the demo software first,
+                         //     then this suddenly works! So clearly, something is
+                         //     wrong/different before this point
         std::this_thread::sleep_for(500ms);
 
         // TODO: Read screen data, and write to display

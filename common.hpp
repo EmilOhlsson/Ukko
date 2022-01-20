@@ -16,6 +16,7 @@ struct Options {
     std::optional<std::string> screen_store{};
     bool verbose = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;
+    std::string spi_device = "/dev/spidev0.0";
 
     bool is_dry() const {
         return run_mode == RunMode::Dry;
