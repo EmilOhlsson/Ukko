@@ -95,9 +95,9 @@ int run(const Options &options) {
         fmt::print("Running\n");
 
         hwif::Pins control_pins{
-            .reset = gpio::Output(options, gpio::Active::Low, 17),
-            .control = gpio::Output(options, gpio::Active::Low, 25),
-            .busy = gpio::Input(options, 24),
+            .reset = gpio::Output(options, gpio::Active::Low, 17, "eink-reset"),
+            .control = gpio::Output(options, gpio::Active::Low, 25, "eink-control"),
+            .busy = gpio::Input(options, 24, "eink-busy"),
         };
 
         // TODO make it possible to toggle running on x86, without risking

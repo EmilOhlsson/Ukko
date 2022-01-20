@@ -25,7 +25,8 @@ struct Output {
      * Create new GPIO output using `pin`. It will be considered active at given `level`.
      * If options describe this as dry run, then no actual GPIO toggling will be made
      */
-    Output(const Options &options, Active level, uint32_t pin) : level(level), options(options) {
+    Output(const Options &options, Active level, uint32_t pin, const std::string &name)
+        : level(level), options(options) {
         if (options.is_dry()) {
             return;
         }
@@ -33,7 +34,7 @@ struct Output {
         chip = gpiod::chip("gpiochip0");
         line = chip.get_line(pin);
         line.request(gpiod::line_request{
-            .consumer = "Consumer",
+            .consumer = name,
             .request_type = gpiod::line_request::DIRECTION_OUTPUT,
             .flags = {},
         });
@@ -69,16 +70,15 @@ struct Output {
 };
 
 struct Input {
-    Input(const Options &options, uint32_t pin) : options(options) {
+    Input(const Options &options, uint32_t pin, const std::string &name) : options(options) {
         if (options.is_dry()) {
             return;
         }
 
         chip = gpiod::chip("gpiochip0");
         line = chip.get_line(pin);
-        // line.set_direction_input();
         line.request({
-            .consumer = "Consumer?",
+            .consumer = name,
             .request_type = gpiod::line_request::EVENT_RISING_EDGE,
             .flags = {},
         });
@@ -98,7 +98,10 @@ struct Input {
                 fmt::print("Read event: {}\n", event.event_type);
                 break;
             } else {
-                fmt::print("Timeout while waiting for event, retrying\n");
+                fmt::print("Timeout while waiting for event, retrying {}\n", line.get_value());
+                if (line.get_value() == 0) {
+                    break;
+                }
             }
         }
     }
