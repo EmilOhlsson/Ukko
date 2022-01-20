@@ -88,6 +88,7 @@ int run(const Options &options) {
         .busy = gpio::Input(options, 24, "eink-busy"),
     };
     hwif::Hwif m_hwif(options, control_pins);
+    Display display(m_hwif);
 
     {
         std::vector<weather::Hour> dps = weather.retrieve();
@@ -100,13 +101,12 @@ int run(const Options &options) {
         using namespace std::literals::chrono_literals;
         fmt::print("Running\n");
 
-        // TODO make it possible to toggle running on x86, without risking
-        // toggling of GPIOs
+        // TODO: Continue to clean up gpio, hwif, display
+        //       And the compare the code with the demo
+        //       code to figure out why it's behaving odd
 
-        // TODO: Move out spidevice to above, and keep it open
-
-        // TODO: Move out display to above, and keep it open
-        Display display(m_hwif);
+        // TODO: Create an interface for doing some proper
+        //       logging, it's time to bring it out now
 
         // TODO: This should be done outside of loop
         fmt::print("Initializing display\n");
