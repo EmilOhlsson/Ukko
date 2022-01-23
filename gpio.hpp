@@ -93,7 +93,7 @@ struct Input {
         using namespace std::literals::chrono_literals;
 
         while (true) {
-            if (line.event_wait(5s)) {
+            if (line.event_wait(1s)) {
                 gpiod::line_event event = line.event_read();
                 log("Read event: {}", event.event_type);
                 break;

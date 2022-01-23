@@ -42,7 +42,7 @@ enum class Command : uint8_t {
     LutBlue = 0x21,
     LutWhite = 0x22,
     LutGray1 = 0x23,
-    LutGray2 = 0x23,
+    LutGray2 = 0x24,
     KWLUOption = 0x2B,
     PLLControl = 0x30,
     TemperatureSensorCalibration = 0x40,
