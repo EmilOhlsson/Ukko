@@ -135,6 +135,8 @@ int run(const Options &options) {
         display.render(screen.get_ptr());
         log("Drawing framebuffer");
         display.draw();
+
+        log("Sleeping for {} minute(s)", options.sleep.count());
         display.enter_sleep();
         std::this_thread::sleep_for(options.sleep);
     }
