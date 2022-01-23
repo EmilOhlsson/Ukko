@@ -102,7 +102,7 @@ struct Hwif {
     }
 
     void reset() {
-        fmt::print("Resetting screen\n");
+        log("Resetting screen");
 
         using namespace std::literals::chrono_literals;
         pins.reset.deactive();
@@ -170,7 +170,7 @@ struct Hwif {
         }
 
         std::vector<uint8_t> buffer(data, data + size);
-        fmt::print("writing {}\n", buffer | std::views::take(16));
+        log("writing {}", buffer | std::views::take(16));
 
         static constexpr size_t chunk_size = 64;
         size_t written = 0;
@@ -278,6 +278,7 @@ struct Hwif {
     uint16_t m_mode = 0;
 
     const Options &options;
+    const Logger log = options.get_logger(Logger::Facility::Hwif);
 };
 
 } // namespace hwif

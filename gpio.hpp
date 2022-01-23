@@ -85,7 +85,7 @@ struct Input {
     }
 
     void wfi() {
-        fmt::print("Awaiting interrupt\n");
+        log("Awaiting interrupt");
         if (options.is_dry()) {
             return;
         }
@@ -95,10 +95,10 @@ struct Input {
         while (true) {
             if (line.event_wait(5s)) {
                 gpiod::line_event event = line.event_read();
-                fmt::print("Read event: {}\n", event.event_type);
+                log("Read event: {}", event.event_type);
                 break;
             } else {
-                fmt::print("Timeout while waiting for event, retrying {}\n", line.get_value());
+                log("Timeout while waiting for event, retrying {}", line.get_value());
                 if (line.get_value() == 0) {
                     break;
                 }
@@ -110,6 +110,7 @@ struct Input {
     gpiod::chip chip;
     gpiod::line line;
     const Options &options;
+    const Logger log = options.get_logger(Logger::Facility::Gpio);
 };
 
 } // namespace gpio
