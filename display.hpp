@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <cairomm/surface.h>
+#include <cassert>
 #include <fmt/os.h>
 
 #include "hwif.hpp"
@@ -77,6 +78,7 @@ struct Display {
     void clear() {
         using namespace hwif;
         std::vector<uint8_t> buffer = std::vector<uint8_t>(WIDTH * HEIGHT);
+        assert(buffer.size() == WIDTH * HEIGHT);
 
         log("Clearing display");
         std::ranges::fill(buffer, 0xFF);
