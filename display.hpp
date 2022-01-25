@@ -77,8 +77,8 @@ struct Display {
 
     void clear() {
         using namespace hwif;
-        std::vector<uint8_t> buffer = std::vector<uint8_t>(WIDTH * HEIGHT);
-        assert(buffer.size() == WIDTH * HEIGHT);
+        std::vector<uint8_t> buffer = std::vector<uint8_t>(IMG_SIZE);
+        assert(buffer.size() == IMG_SIZE);
 
         log("Clearing display");
         std::ranges::fill(buffer, 0xFF);
