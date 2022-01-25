@@ -6,6 +6,7 @@
 #include <memory>
 
 #include <gpiod.hpp>
+#include <thread>
 
 #include "common.hpp"
 #include "file.hpp"
@@ -104,6 +105,7 @@ struct Input {
                 }
             }
         }
+	std::this_thread::sleep_for(5ms);
     }
 
   private:
