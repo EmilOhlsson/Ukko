@@ -79,6 +79,12 @@ struct Hwif {
     Hwif(const Options &options, Pins &pins) : pins(pins), options(options) {
         fd = options.is_dry() ? nullptr
                               : std::make_unique<File>(options.spi_device, O_RDWR | O_SYNC);
+        if (options.is_dry()) {
+            return;
+        }
+
+        uint8_t bits = 8;
+        ioctl(*fd, SPI_IOC_WR_BITS_PER_WORD, &bits);
 
         set_mode(SPI_MODE_0);
         set_chip_select(ChipSelect::Low);
