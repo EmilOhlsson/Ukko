@@ -114,6 +114,8 @@ int run(const Options &options) {
     log("Initializing display");
     display.init();
     display.clear();
+    display.clear();
+    display.clear();
 
     for (uint32_t i = 0; options.cycles == 0 || i < options.cycles; i++) {
         std::vector<weather::Hour> dps = weather.retrieve();
