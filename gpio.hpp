@@ -40,15 +40,16 @@ struct Output {
             .request_type = gpiod::line_request::DIRECTION_OUTPUT,
             .flags = {},
         });
-	assert(line.is_requested());
+        line.set_direction_output(0);
+        assert(line.is_requested());
     }
 
     /**
      * Set pin to active state, as per `active` level given at construction
      */
     void activate() {
-	int value = static_cast<int>(level);
-	log("Setting pin {} to {}", line.name(), value);
+        int value = static_cast<int>(level);
+        log("Setting pin {} to {}", line.name(), value);
         if (options.is_dry()) {
             return;
         }
@@ -60,8 +61,8 @@ struct Output {
      * Set pin to deactive state, as per `active` level given at construction
      */
     void deactive() {
-	int value = !static_cast<int>(level);
-	log("Setting pin {} to {}", line.name(), value);
+        int value = !static_cast<int>(level);
+        log("Setting pin {} to {}", line.name(), value);
         if (options.is_dry()) {
             return;
         }
@@ -90,7 +91,8 @@ struct Input {
             .request_type = gpiod::line_request::DIRECTION_INPUT,
             .flags = {},
         });
-	assert(line.is_requested());
+        line.set_direction_input();
+        assert(line.is_requested());
     }
 
     void wfi() {
@@ -101,24 +103,24 @@ struct Input {
             return;
         }
 
-	int sleep_count = 0;
-	do {
-		std::this_thread::sleep_for(5ms);
-		sleep_count += 1;
-	} while (!line.get_value());
-	log("Slept for {} iterations", sleep_count);
-        //while (true) {
-        //    if (line.event_wait(1s)) {
-        //        gpiod::line_event event = line.event_read();
-        //        log("Read event: {}", event.event_type);
-        //        break;
-        //    } else {
-        //        log("Timeout while waiting for event, retrying {}", line.get_value());
-        //        if (line.get_value() == 0) {
-        //            break;
-        //        }
-        //    }
-        //}
+        int sleep_count = 0;
+        do {
+            std::this_thread::sleep_for(5ms);
+            sleep_count += 1;
+        } while (!line.get_value());
+        log("Slept for {} iterations", sleep_count);
+        // while (true) {
+        //     if (line.event_wait(1s)) {
+        //         gpiod::line_event event = line.event_read();
+        //         log("Read event: {}", event.event_type);
+        //         break;
+        //     } else {
+        //         log("Timeout while waiting for event, retrying {}", line.get_value());
+        //         if (line.get_value() == 0) {
+        //             break;
+        //         }
+        //     }
+        // }
         std::this_thread::sleep_for(5ms);
     }
 
