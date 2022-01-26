@@ -33,15 +33,39 @@ struct Output {
             return;
         }
 
-        chip = gpiod::chip("gpiochip0");
-        line = chip.get_line(pin);
-        line.request(gpiod::line_request{
-            .consumer = name,
-            .request_type = gpiod::line_request::DIRECTION_OUTPUT,
-            .flags = {},
-        });
-        line.set_direction_output(0);
-        assert(line.is_requested());
+        chip = gpiod_chip_open("gpiochip0");
+        if (!chip) {
+            throw std::runtime_error("Unable to open gpio chip");
+        }
+
+        line = gpiod_chip_get_line(chip, pin);
+        if (!line) {
+            throw std::runtime_error("Unable to get line");
+        }
+
+        gpiod_line_request_config cfg{
+            .consumer = name.c_str(),
+            .request_type = GPIOD_LINE_REQUEST_DIRECTION_OUTPUT,
+            .flags = 0,
+        };
+        if (gpiod_line_request(line, &cfg, 0) != 0) {
+            throw std::runtime_error("Unable to request output");
+        }
+
+        // chip = gpiod::chip("gpiochip0");
+        // line = chip.get_line(pin);
+        // line.request(gpiod::line_request{
+        //     .consumer = name,
+        //     .request_type = gpiod::line_request::DIRECTION_OUTPUT,
+        //     .flags = {},
+        // });
+        ////line.set_direction_output(0);
+        // assert(line.is_requested());
+    }
+
+    ~Output() {
+        gpiod_line_release(line);
+        gpiod_chip_close(chip);
     }
 
     /**
@@ -49,12 +73,15 @@ struct Output {
      */
     void activate() {
         int value = static_cast<int>(level);
-        log("Setting pin {} to {}", line.name(), value);
+        log("Setting pin {} to {}", gpiod_line_name(line), value);
         if (options.is_dry()) {
             return;
         }
 
-        line.set_value(value);
+        // line.set_value(value);
+        if (gpiod_line_set_value(line, value) != 0) {
+            throw std::runtime_error("Unable to activate pin");
+        }
     }
 
     /**
@@ -62,16 +89,21 @@ struct Output {
      */
     void deactive() {
         int value = !static_cast<int>(level);
-        log("Setting pin {} to {}", line.name(), value);
+        log("Setting pin {} to {}", gpiod_line_name(line), value);
         if (options.is_dry()) {
             return;
         }
-        line.set_value(value);
+        // line.set_value(value);
+        if (gpiod_line_set_value(line, value) != 0) {
+            throw std::runtime_error("Unable to deactivate pin");
+        }
     }
 
   private:
-    gpiod::chip chip;
-    gpiod::line line;
+    // gpiod::chip chip;
+    // gpiod::line line;
+    gpiod_chip *chip{};
+    gpiod_line *line{};
 
     Active level;
     const Options &options;
@@ -84,15 +116,35 @@ struct Input {
             return;
         }
 
-        chip = gpiod::chip("gpiochip0");
-        line = chip.get_line(pin);
-        line.request({
-            .consumer = name,
+        chip = gpiod_chip_open("gpiochip0");
+        if (!chip) {
+            throw std::runtime_error("Error opening chip");
+        }
+
+        line = gpiod_chip_get_line(chip, pin);
+        if (!line) {
+            throw std::runtime_error("Error opening line");
+        }
+
+        gpiod_line_request_config cfg{
+            .consumer = name.c_str(),
             .request_type = gpiod::line_request::DIRECTION_INPUT,
-            .flags = {},
-        });
-        line.set_direction_input();
-        assert(line.is_requested());
+            .flags = 0,
+        };
+
+        if (gpiod_line_request(line, &cfg, 0) != 0) {
+            throw std::runtime_error("Unable to request line");
+        }
+
+        // chip = gpiod::chip("gpiochip0");
+        // line = chip.get_line(pin);
+        // line.request({
+        //     .consumer = name,
+        //     .request_type = gpiod::line_request::DIRECTION_INPUT,
+        //     .flags = {},
+        // });
+        // line.set_direction_input();
+        // assert(line.is_requested());
     }
 
     void wfi() {
@@ -107,7 +159,7 @@ struct Input {
         do {
             std::this_thread::sleep_for(5ms);
             sleep_count += 1;
-        } while (!line.get_value());
+        } while (!gpiod_line_get_value(line));
         log("Slept for {} iterations", sleep_count);
         // while (true) {
         //     if (line.event_wait(1s)) {
@@ -125,8 +177,10 @@ struct Input {
     }
 
   private:
-    gpiod::chip chip;
-    gpiod::line line;
+    // gpiod::chip chip;
+    // gpiod::line line;
+    gpiod_chip *chip{};
+    gpiod_line *line{};
     const Options &options;
     const Logger log = options.get_logger(Logger::Facility::Gpio);
 };
