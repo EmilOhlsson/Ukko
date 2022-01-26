@@ -113,21 +113,13 @@ int run(const Options &options) {
 
     log("Initializing display");
     display.init();
-    display.clear();
-    display.clear();
-    display.clear();
 
     for (uint32_t i = 0; options.cycles == 0 || i < options.cycles; i++) {
         std::vector<weather::Hour> dps = weather.retrieve();
         screen.draw(dps);
 
         log("Clearing display");
-        display.clear(); // <-- This seem to fail, when waiting for event after
-                         //     waiting for !busy after writing {18}, DisplayRefresh
-                         //     And it truly doesn't seem to be done!
-                         //     But if this is run with the demo software first,
-                         //     then this suddenly works! So clearly, something is
-                         //     wrong/different before this point
+        display.clear();
         std::this_thread::sleep_for(500ms);
 
         log("Setting up framebuffer");
