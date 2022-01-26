@@ -89,7 +89,7 @@ struct Output {
      */
     void deactive() {
         int value = !static_cast<int>(level);
-        log("Setting pin {} to {}", gpiod_line_name(line), value);
+        log("Setting pin to {}", value);
         if (options.is_dry()) {
             return;
         }
