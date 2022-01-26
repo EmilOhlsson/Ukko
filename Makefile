@@ -1,4 +1,4 @@
-.PHONY: all debug sanitized release format clean
+.PHONY: all debug sanitized release install format clean
 
 SRCS = $(wildcard *.cpp)
 HDRS = $(wildcard *.hpp)
@@ -26,11 +26,17 @@ LDLIBS += $(LDLIBS_$(PROFILE))
 LDFLAGS_sanitize = -fsanitize=address
 LDFLAGS += $(LDFLAGS_$(PROFILE))
 
+PREFIX ?= /usr
+
 all: debug
 debug sanitized release:
 	$(MAKE) PROFILE=$@ ukko
 
 ukko: $(OBJS)
+
+install: ukko
+	cp ukko $(PREFIX)/bin
+	cp ukko.service /etc/systemd/system
 
 format:
 	clang-format -i $(SRCS) $(HDRS)

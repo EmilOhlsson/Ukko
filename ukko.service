@@ -1,0 +1,10 @@
+[Unit]
+Description=Displays forecast
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/ukko
+
+[Install]
+WantedBy=multi-user.target
