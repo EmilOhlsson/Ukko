@@ -33,9 +33,9 @@ struct Output {
             return;
         }
 
-        chip = gpiod_chip_open("gpiochip0");
+        chip = gpiod_chip_open("/dev/gpiochip0");
         if (!chip) {
-            throw std::runtime_error("Unable to open gpio chip");
+            throw std::runtime_error("Unable to open gpio chip for output");
         }
 
         line = gpiod_chip_get_line(chip, pin);
@@ -116,9 +116,9 @@ struct Input {
             return;
         }
 
-        chip = gpiod_chip_open("gpiochip0");
+        chip = gpiod_chip_open("/dev/gpiochip0");
         if (!chip) {
-            throw std::runtime_error("Error opening chip");
+            throw std::runtime_error("Error opening chip for input");
         }
 
         line = gpiod_chip_get_line(chip, pin);
