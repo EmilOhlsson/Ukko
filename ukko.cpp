@@ -111,21 +111,16 @@ int run(const Options &options) {
     hwif::Hwif m_hwif(options, control_pins);
     Display display(options, m_hwif);
 
-    log("Initializing display");
-    display.init();
-
     for (uint32_t i = 0; options.cycles == 0 || i < options.cycles; i++) {
-        std::vector<weather::Hour> dps = weather.retrieve();
-        screen.draw(dps);
+        log("Waking display");
+        display.wake_up();
 
         log("Clearing display");
         display.clear();
         std::this_thread::sleep_for(500ms);
 
-        log("Setting up framebuffer");
-
-        display.clear();
-        std::this_thread::sleep_for(500ms);
+        std::vector<weather::Hour> dps = weather.retrieve();
+        screen.draw(dps);
 
         display.render(screen.get_ptr());
         log("Drawing framebuffer");

@@ -14,14 +14,12 @@ struct Display {
     }
 
     /**
-     * Initialize display
+     * Wake up display
      */
-    void init() {
+    void wake_up() {
         using namespace std::literals::chrono_literals;
         using namespace hwif;
-
         hwif.reset();
-
         hwif.send(Command::PowerSettings, {0x17, 0x17, 0x3f, 0x3f, 0x11}); // Power setting
         hwif.send(Command::VCOMDCSetting, {0x24});                         // VCOM
         hwif.send(Command::BoosterSoftStart, {0x27, 0x27, 0x2f, 0x17});    // Booster soft start
@@ -101,9 +99,7 @@ struct Display {
         using namespace hwif;
 
         log("Entering sleep");
-        hwif.send(Command::PowerOff);
-        hwif.wait_for_idle();
-        hwif.send(Command::DeepSleep, {0x07});
+        hwif.send(Command::DeepSleep, {0xA5});
     }
 
     /**
