@@ -31,7 +31,9 @@ class Screen {
     const std::optional<std::string> &filename;
 
     /**
-     * Representation of range from low to high value
+     * Representation of range from low to high value.
+     *
+     * The low-value does not need to smaller than the high value.
      * */
     struct Range {
         Range(double lo, double hi) : lo(lo), hi(hi) {
@@ -57,16 +59,42 @@ class Screen {
         }
     };
 
-  public:
-    Screen(const Options &options) : options(options), filename(options.render_store) {
-        context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
-    }
+    /**
+     * Represent an area
+     */
+    class Area {
+        Range x;
+        Range y;
 
-    void draw(const std::vector<weather::Hour> &dps) {
-        log("Drawing data points to screen");
-        surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
-        context = Cairo::Context::create(surface);
+      public:
+        Area(Range x, Range y) : x(x), y(y) {
+        }
 
+        double left() const {
+            return x.lo;
+        }
+        double right() const {
+            return x.hi;
+        }
+        double width() const {
+            return abs(x.hi - x.lo);
+        }
+
+        double top() const {
+            return y.lo;
+        }
+        double bottom() const {
+            return y.hi;
+        }
+        double height() const {
+            return abs(y.hi - y.lo);
+        }
+    };
+
+    /**
+     * Draw forecast on given area
+     */
+    void draw_forecast(const std::vector<weather::Hour> &dps, const Area &area) {
         /* number of samples, limit to coming 12 h */
         const size_t samples = std::min<size_t>(dps.size(), 12);
 
@@ -77,10 +105,10 @@ class Screen {
         const Range temperature_range(*minp, *maxp);
 
         /* Limit graph area */
-        const double graph_x_offset = 50;
-        const double graph_width = WIDTH - graph_x_offset;
-        const double graph_y_offset = 30;
-        const Range graph_y_range(HEIGHT - graph_y_offset, graph_y_offset);
+        const double graph_x_offset = area.left() + 50;
+        const double graph_width = area.width() - 50;
+        const double graph_y_offset = area.top() + 30;
+        const Range graph_y_range(area.bottom() - 30, graph_y_offset);
 
         const double steps = samples - 1;
         const double step_size = graph_width / steps;
@@ -116,6 +144,7 @@ class Screen {
         /* Conversion object that maps input temperature range, to screen pixels */
         const Conv conv{input_range, graph_y_range};
 
+        context->set_font_size(20.0);
         /* Draw the levels, and annotate them */
         for (int l = input_range.lo; l <= input_range.hi; l++) {
             if (l == 0) {
@@ -131,8 +160,8 @@ class Screen {
             context->stroke();
 
             /* Print temperature */
-            context->move_to(10, conv(l));
-            context->show_text(fmt::format("{}°C", l));
+            context->move_to(area.left(), conv(l) + 5);
+            context->show_text(fmt::format("{}°", l));
             context->stroke();
         }
 
@@ -141,10 +170,10 @@ class Screen {
         const auto get_time = [](const auto &dp) { return dp.time; };
         const auto timestamps =
             dps | std::views::take(samples - 1) | std::views::transform(get_time);
-        constexpr double clock_y = HEIGHT - 10;
+        const double clock_y = area.bottom() - 10;
         for (const auto &timestamp : timestamps) {
             context->move_to(clock_x, clock_y);
-            context->show_text(fmt::format("{:%H:%M}", timestamp));
+            context->show_text(fmt::format("{:%H}", timestamp));
             context->stroke();
             clock_x += step_size;
         }
@@ -158,6 +187,19 @@ class Screen {
             context->line_to(graph_x += step_size, conv(temperature));
         }
         context->stroke();
+    }
+
+  public:
+    Screen(const Options &options) : options(options), filename(options.render_store) {
+        context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
+    }
+
+    void draw(const std::vector<weather::Hour> &dps) {
+        log("Drawing data points to screen");
+        surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
+        context = Cairo::Context::create(surface);
+
+        draw_forecast(dps, Area(Range(10, WIDTH - 10), Range(0, HEIGHT)));
 
         if (filename) {
             surface->write_to_png(fmt::format("{}-{}.png", *filename, render_number));

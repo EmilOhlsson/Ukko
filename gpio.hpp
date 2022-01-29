@@ -55,8 +55,12 @@ struct Output {
     }
 
     ~Output() {
-        gpiod_line_release(line);
-        gpiod_chip_close(chip);
+        if (line) {
+            gpiod_line_release(line);
+        }
+        if (chip) {
+            gpiod_chip_close(chip);
+        }
     }
 
     /**
@@ -128,8 +132,12 @@ struct Input {
     }
 
     ~Input() {
-        gpiod_line_release(line);
-        gpiod_chip_close(chip);
+        if (line) {
+            gpiod_line_release(line);
+        }
+        if (chip) {
+            gpiod_chip_close(chip);
+        }
     }
 
     void wfi() {
