@@ -145,6 +145,8 @@ class Screen {
         const Conv conv{input_range, graph_y_range};
 
         context->set_font_size(20.0);
+        context->select_font_face("cairo:sans-serif", Cairo::FONT_SLANT_NORMAL,
+                                  Cairo::FONT_WEIGHT_BOLD);
         /* Draw the levels, and annotate them */
         for (int l = input_range.lo; l <= input_range.hi; l++) {
             if (l == 0) {
