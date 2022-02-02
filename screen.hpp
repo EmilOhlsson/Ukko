@@ -126,7 +126,7 @@ class Screen {
         int block_size = 0;
         int blocks = 0;
         const int span = std::ceil(temperature_range.hi - temperature_range.lo);
-        constexpr int max_blocks = 7;
+        constexpr int max_blocks = 5;
         for (const int bsize : {1, 2, 5, 10, 20, 50, 100}) {
             blocks = utils::div_ceil(span, bsize);
             if (blocks < max_blocks) {
@@ -137,16 +137,22 @@ class Screen {
         assert(block_size > 0);
 
         /* Calculate a lower line, i.e, min value rounded down to multiple of block size */
-        const Range input_range(
-            utils::round_down<int>(std::floor(temperature_range.lo), block_size),
-            utils::round_up<int>(std::ceil(temperature_range.hi), block_size));
+        int lo_line = utils::round_down<int>(std::floor(temperature_range.lo), block_size);
+        int hi_line = utils::round_up<int>(std::ceil(temperature_range.hi), block_size);
+
+        /* Make sure there are at least four lines */
+        if (hi_line - lo_line <= 1) {
+            lo_line -= 1;
+            hi_line += 1;
+        }
+        const Range input_range(lo_line, hi_line);
 
         /* Conversion object that maps input temperature range, to screen pixels */
         const Conv conv{input_range, graph_y_range};
 
         context->set_font_size(20.0);
         context->select_font_face("cairo:sans-serif", Cairo::FONT_SLANT_NORMAL,
-                                  Cairo::FONT_WEIGHT_BOLD);
+                                  Cairo::FONT_WEIGHT_NORMAL);
         /* Draw the levels, and annotate them */
         for (int l = input_range.lo; l <= input_range.hi; l++) {
             if (l == 0) {
