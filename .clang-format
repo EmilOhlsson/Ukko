@@ -23,7 +23,9 @@ BinPackArguments: true
 BinPackParameters: true
 
 BreakBeforeBinaryOperators: None
-BreakBeforeBraces: Attach
+BreakBeforeBraces: Custom
+BraceWrapping:
+    SplitEmptyFunction: false
 BreakBeforeTernaryOperators: true
 BreakConstructorInitializersBeforeComma: true
 

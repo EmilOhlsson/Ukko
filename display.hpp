@@ -34,7 +34,7 @@ struct Display {
         hwif.send(Command::TCONSetting, {0x22});                         // TCON
         hwif.send(Command::GateSourceStartSetting, {0x00, 0x00, 0x00, 0x00}); // Gate/source start
 
-        // LUT setup
+        /* LUT setup */
         hwif.send(Command::LutVcom,
                   {
                       /* LUT VCOM */

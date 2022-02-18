@@ -18,11 +18,12 @@ enum class RunMode {
 struct Logger {
     enum class Facility {
         Ukko,
-        Weather,
+        Forecast,
         Screen,
         Display,
         Hwif,
         Gpio,
+        Weather,
     };
 
     Logger(Facility facility, bool verbose) : facility(facility), verbose(verbose) {
@@ -47,7 +48,7 @@ struct Logger {
             case Facility::Gpio:
                 return "GPIO";
 
-            case Facility::Weather:
+            case Facility::Forecast:
                 return "Weather";
 
             case Facility::Screen:
@@ -58,6 +59,9 @@ struct Logger {
 
             case Facility::Hwif:
                 return "Hwif";
+
+            case Facility::Weather:
+                return "Weather";
         }
         return "Broken";
     }
@@ -69,7 +73,12 @@ struct Options {
     std::optional<std::string> forecast_store{};
     std::optional<std::string> screen_store{};
     std::optional<std::string> render_store{};
-    std::chrono::minutes sleep{120};
+    std::optional<std::string> netatmo_store{};
+    std::optional<std::string> netatmo_load{};
+
+    std::string settings_file = "/etc/ukko.lua";
+
+    std::chrono::minutes sleep{60};
     bool verbose = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;
     std::string spi_device = "/dev/spidev0.0";
@@ -81,6 +90,11 @@ struct Options {
     Logger get_logger(Logger::Facility facility) const {
         return Logger(facility, verbose);
     }
+};
+
+struct Position {
+    std::string longitude;
+    std::string latitude;
 };
 
 /* We're assuming A1 format, monochrome */

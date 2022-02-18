@@ -12,8 +12,9 @@
 #include <span>
 
 #include "common.hpp"
+#include "forecast.hpp"
+#include "netatmo.hpp"
 #include "utils.hpp"
-#include "weather.hpp"
 
 class Screen {
     static constexpr Cairo::Format FORMAT = Cairo::Format::FORMAT_A1;
@@ -94,12 +95,14 @@ class Screen {
     /**
      * Draw forecast on given area
      */
-    void draw_forecast(const std::vector<weather::Hour> &dps, const Area &area) {
+    void draw_forecast(const std::vector<Forecast::DataPoint> &dps, const Area &area) {
         /* number of samples, limit to coming 12 h */
         const size_t samples = std::min<size_t>(dps.size(), 12);
 
         /* Relavant temperature range */
-        const auto &get_temp = [](const weather::Hour &dp) -> double { return dp.temperature; };
+        const auto &get_temp = [](const Forecast::DataPoint &dp) -> double {
+            return dp.temperature;
+        };
         const auto temperatures = dps | std::views::take(samples) | std::views::transform(get_temp);
         const auto [minp, maxp] = std::ranges::minmax_element(temperatures);
         const Range temperature_range(*minp, *maxp);
@@ -197,17 +200,71 @@ class Screen {
         context->stroke();
     }
 
+    /**
+     * Draw current measured values
+     */
+    void draw_values(const Weather::MeasuredData &mdp) {
+        const double font_large = 64.0;
+        const double font_small = 32.0;
+        const double font_tiny = 12.0;
+        const double spacing = 5.0;
+        const double indent_small = 10.0;
+        const double indent_large = 40.0;
+        const double indoor_y = spacing + font_small + spacing + font_large;
+        const double outdoor_y = HEIGHT - spacing - font_small - spacing;
+        const double above = font_large + spacing;
+        const double below = font_small + spacing;
+
+        /* Set up font */
+        context->set_font_size(font_large);
+        context->select_font_face("cairo:sans-serif", Cairo::FONT_SLANT_NORMAL,
+                                  Cairo::FONT_WEIGHT_NORMAL);
+
+        /* Draw current temperatures */
+        context->move_to(indent_small, outdoor_y);
+        context->show_text(fmt::format("{}°", mdp.outdoor.now));
+
+        context->move_to(indent_small, indoor_y);
+        context->show_text(fmt::format("{}°", mdp.indoor.now));
+
+        context->set_font_size(font_small);
+
+        /* Draw min/max as smaller text next to current values */
+        context->move_to(indent_large, indoor_y - above);
+        context->show_text(fmt::format("{}°", mdp.indoor.max));
+        context->move_to(indent_large, indoor_y + below);
+        context->show_text(fmt::format("{}°", mdp.indoor.min));
+
+        context->move_to(indent_large, outdoor_y - above);
+        context->show_text(fmt::format("{}°", mdp.outdoor.max));
+        context->move_to(indent_large, outdoor_y + below);
+        context->show_text(fmt::format("{}°", mdp.outdoor.min));
+
+        /* Annotation */
+        context->set_font_size(font_tiny);
+        context->move_to(indent_small, indoor_y - above);
+        context->show_text("Inne");
+        context->move_to(indent_small, outdoor_y - above);
+        context->show_text("Ute");
+    }
+
   public:
     Screen(const Options &options) : options(options), filename(options.render_store) {
         context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
     }
 
-    void draw(const std::vector<weather::Hour> &dps) {
+    /**
+     * Draw forecast and measured values on screen
+     */
+    void draw(const std::vector<Forecast::DataPoint> &dps, const Weather::MeasuredData &mdp) {
+        // TODO: There might be a point in having parameters optional, as there could be a scenario
+        //       where we didn't get any values.
         log("Drawing data points to screen");
         surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
         context = Cairo::Context::create(surface);
 
-        draw_forecast(dps, Area(Range(10, WIDTH - 10), Range(0, HEIGHT)));
+        draw_values(mdp);
+        draw_forecast(dps, Area(Range(192, WIDTH - 10), Range(0, HEIGHT)));
 
         if (filename) {
             surface->write_to_png(fmt::format("{}-{}.png", *filename, render_number));
