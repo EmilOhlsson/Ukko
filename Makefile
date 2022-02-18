@@ -16,11 +16,11 @@ CXXFLAGS += -Wall -Wextra
 CXXFLAGS += -DDUMMY=$(DUMMY)
 CXXFLAGS += -MMD
 CXXFLAGS += -std=c++20
-CXXFLAGS += $$(pkg-config --cflags cairomm-1.0)
+CXXFLAGS += $$(pkg-config --cflags cairomm-1.0 lua libcurl)
 CXXFLAGS += $(CXXFLAGS_$(PROFILE))
 
 LDLIBS_sanitize += -static-libasan
-LDLIBS += -lstdc++ -lfmt -lgpiod $$(pkg-config --libs cairomm-1.0) -lcurl -lm
+LDLIBS += -lstdc++ -lfmt -lgpiod $$(pkg-config --libs cairomm-1.0 lua libcurl) -lm
 LDLIBS += $(LDLIBS_$(PROFILE))
 
 LDFLAGS_sanitize = -fsanitize=address
