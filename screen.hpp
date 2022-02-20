@@ -173,12 +173,11 @@ class Screen {
             /* Print temperature */
             context->move_to(area.left(), conv(l) + 5);
             context->show_text(fmt::format("{}°", l));
-            context->stroke();
         }
 
         /* Draw timestamps below graph */
         {
-            context->set_font_size(14.0);
+            context->set_font_size(22.0);
             double clock_x = graph_x_offset;
             const auto get_time = [](const auto &dp) { return dp.time; };
             const auto timestamps =
@@ -186,8 +185,7 @@ class Screen {
             const double clock_y = area.bottom() - 10 - 30 - 30 - 30;
             for (const auto &timestamp : timestamps) {
                 context->move_to(clock_x, clock_y);
-                context->show_text(fmt::format("{:%H}:{:%M}", timestamp, timestamp));
-                context->stroke();
+                context->show_text(fmt::format("{:%H}", timestamp));
                 clock_x += step_size;
             }
         }
@@ -199,12 +197,9 @@ class Screen {
             const auto windspeeds =
                 dps | std::views::take(samples - 1) | std::views::transform(get_windspeed);
             const double y = area.bottom() - 10 - 30 - 30;
-            context->move_to(x - 80.0, y);
-            context->show_text("Vind (m/s)");
             for (const auto &windspeed : windspeeds) {
                 context->move_to(x, y);
-                context->show_text(fmt::format("{:.1f}", windspeed));
-                context->stroke();
+                context->show_text(fmt::format("{:.0f}", std::round(windspeed)));
                 x += step_size;
             }
         }
@@ -216,12 +211,9 @@ class Screen {
             const auto gusts =
                 dps | std::views::take(samples - 1) | std::views::transform(get_gust);
             const double y = area.bottom() - 10 - 30;
-            context->move_to(x - 80.0, y);
-            context->show_text("Byar (m/s)");
             for (const auto &gust : gusts) {
                 context->move_to(x, y);
-                context->show_text(fmt::format("{:.1f}", gust));
-                context->stroke();
+                context->show_text(fmt::format("{:.0f}", std::round(gust)));
                 x += step_size;
             }
         }
@@ -233,16 +225,25 @@ class Screen {
             const auto rains =
                 dps | std::views::take(samples - 1) | std::views::transform(get_rain);
             const double y = area.bottom() - 10;
-            context->move_to(x - 80.0, y);
-            context->show_text("Regn (mm)");
             for (const auto &rain : rains) {
                 if (rain > 0) {
                     context->move_to(x, y);
                     context->show_text(fmt::format("{:.1f}", rain));
-                    context->stroke();
                 }
                 x += step_size;
             }
+        }
+
+        {
+            context->set_font_size(14.0);
+            const double x = graph_x_offset + 5;
+            double y = area.bottom() - 10 - 3 * 30;
+            context->move_to(x - 80.0, y += 30);
+            context->show_text("Vind, m/s");
+            context->move_to(x - 80.0, y += 30);
+            context->show_text("Byar, m/s");
+            context->move_to(x - 80.0, y += 30);
+            context->show_text("Regn, mm");
         }
 
         /* Draw temperature curve */
