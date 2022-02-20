@@ -26,6 +26,7 @@ struct Forecast {
         double temperature;
         double windspeed;
         double gusts;
+        double rain;
     };
 
     Forecast(const Options &options)
@@ -55,6 +56,7 @@ struct Forecast {
             double temperature{};
             double windspeed{};
             double gusts{};
+            double rain{};
 
             for (auto &p : dp["parameters"]) {
                 std::string_view name = p["name"].get<std::string_view>();
@@ -64,6 +66,8 @@ struct Forecast {
                     windspeed = p["values"][0].get<double>();
                 } else if (name == "gust") {
                     gusts = p["values"][0].get<double>();
+                } else if (name == "pmean") {
+                    rain = p["values"][0].get<double>();
                 }
             }
 
@@ -72,6 +76,7 @@ struct Forecast {
                 .temperature = temperature,
                 .windspeed = windspeed,
                 .gusts = gusts,
+                .rain = rain,
             });
         }
 

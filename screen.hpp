@@ -111,7 +111,7 @@ class Screen {
         const double graph_x_offset = area.left() + 50;
         const double graph_width = area.width() - 50;
         const double graph_y_offset = area.top() + 30;
-        const Range graph_y_range(area.bottom() - 30, graph_y_offset);
+        const Range graph_y_range(area.bottom() - 30 - 30 - 30 - 30, graph_y_offset);
 
         const double steps = samples - 1;
         const double step_size = graph_width / steps;
@@ -177,16 +177,72 @@ class Screen {
         }
 
         /* Draw timestamps below graph */
-        double clock_x = graph_x_offset;
-        const auto get_time = [](const auto &dp) { return dp.time; };
-        const auto timestamps =
-            dps | std::views::take(samples - 1) | std::views::transform(get_time);
-        const double clock_y = area.bottom() - 10;
-        for (const auto &timestamp : timestamps) {
-            context->move_to(clock_x, clock_y);
-            context->show_text(fmt::format("{:%H}", timestamp));
-            context->stroke();
-            clock_x += step_size;
+        {
+            context->set_font_size(14.0);
+            double clock_x = graph_x_offset;
+            const auto get_time = [](const auto &dp) { return dp.time; };
+            const auto timestamps =
+                dps | std::views::take(samples - 1) | std::views::transform(get_time);
+            const double clock_y = area.bottom() - 10 - 30 - 30 - 30;
+            for (const auto &timestamp : timestamps) {
+                context->move_to(clock_x, clock_y);
+                context->show_text(fmt::format("{:%H}:{:%M}", timestamp, timestamp));
+                context->stroke();
+                clock_x += step_size;
+            }
+        }
+
+        /* Show windspeed */
+        {
+            double x = graph_x_offset;
+            const auto get_windspeed = [](const auto &dp) { return dp.windspeed; };
+            const auto windspeeds =
+                dps | std::views::take(samples - 1) | std::views::transform(get_windspeed);
+            const double y = area.bottom() - 10 - 30 - 30;
+            context->move_to(x - 80.0, y);
+            context->show_text("Vind (m/s)");
+            for (const auto &windspeed : windspeeds) {
+                context->move_to(x, y);
+                context->show_text(fmt::format("{:.1f}", windspeed));
+                context->stroke();
+                x += step_size;
+            }
+        }
+
+        /* Show gusts */
+        {
+            double x = graph_x_offset;
+            const auto get_gust = [](const auto &dp) { return dp.gusts; };
+            const auto gusts =
+                dps | std::views::take(samples - 1) | std::views::transform(get_gust);
+            const double y = area.bottom() - 10 - 30;
+            context->move_to(x - 80.0, y);
+            context->show_text("Byar (m/s)");
+            for (const auto &gust : gusts) {
+                context->move_to(x, y);
+                context->show_text(fmt::format("{:.1f}", gust));
+                context->stroke();
+                x += step_size;
+            }
+        }
+
+        /* Show rain */
+        {
+            double x = graph_x_offset;
+            const auto get_rain = [](const auto &dp) { return dp.rain; };
+            const auto rains =
+                dps | std::views::take(samples - 1) | std::views::transform(get_rain);
+            const double y = area.bottom() - 10;
+            context->move_to(x - 80.0, y);
+            context->show_text("Regn (mm)");
+            for (const auto &rain : rains) {
+                if (rain > 0) {
+                    context->move_to(x, y);
+                    context->show_text(fmt::format("{:.1f}", rain));
+                    context->stroke();
+                }
+                x += step_size;
+            }
         }
 
         /* Draw temperature curve */
@@ -204,15 +260,17 @@ class Screen {
      * Draw current measured values
      */
     void draw_values(const Weather::MeasuredData &mdp) {
-        const double font_large = 64.0;
+        const double font_large = 56.0;
         const double font_small = 32.0;
-        const double font_tiny = 12.0;
+        const double font_tiny = 14.0;
         const double spacing = 5.0;
         const double indent_small = 10.0;
         const double indent_large = 40.0;
         const double indoor_y = spacing + font_small + spacing + font_large;
         const double outdoor_y = HEIGHT - spacing - font_small - spacing;
-        const double above = font_large + spacing;
+        const double rain_y = HEIGHT / 2.0 + font_small / 2;
+        const double above_large = font_large + spacing;
+        const double above_small = font_small + spacing;
         const double below = font_small + spacing;
 
         /* Set up font */
@@ -228,24 +286,28 @@ class Screen {
         context->show_text(fmt::format("{}°", mdp.indoor.now));
 
         context->set_font_size(font_small);
+        context->move_to(indent_small, rain_y);
+        context->show_text(fmt::format("{:.1f} / {:.1f}", mdp.rain.last_1h, mdp.rain.last_24h));
 
         /* Draw min/max as smaller text next to current values */
-        context->move_to(indent_large, indoor_y - above);
+        context->move_to(indent_large, indoor_y - above_large);
         context->show_text(fmt::format("{}°", mdp.indoor.max));
         context->move_to(indent_large, indoor_y + below);
         context->show_text(fmt::format("{}°", mdp.indoor.min));
 
-        context->move_to(indent_large, outdoor_y - above);
+        context->move_to(indent_large, outdoor_y - above_large);
         context->show_text(fmt::format("{}°", mdp.outdoor.max));
         context->move_to(indent_large, outdoor_y + below);
         context->show_text(fmt::format("{}°", mdp.outdoor.min));
 
         /* Annotation */
         context->set_font_size(font_tiny);
-        context->move_to(indent_small, indoor_y - above);
+        context->move_to(indent_small, indoor_y - above_large);
         context->show_text("Inne");
-        context->move_to(indent_small, outdoor_y - above);
+        context->move_to(indent_small, outdoor_y - above_large);
         context->show_text("Ute");
+        context->move_to(indent_small, rain_y - above_small);
+        context->show_text("Regn (mm), 1h/24h");
     }
 
   public:
