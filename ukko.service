@@ -2,8 +2,13 @@
 Description=Displays forecast
 After=multi-user.target
 
+StartLimitIntervalSec=500
+StartLimitBurst=5
+
 [Service]
 Type=simple
+Restart=on-failure
+RestartSec=60s
 ExecStart=/usr/bin/ukko
 
 [Install]
