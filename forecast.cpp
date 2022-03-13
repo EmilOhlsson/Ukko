@@ -1,3 +1,4 @@
+#include <curl/curl.h>
 #include <exception>
 #include <fmt/chrono.h>
 #include <fmt/core.h>
@@ -44,12 +45,15 @@ Forecast::Forecast(const Options &options)
 }
 
 std::optional<std::vector<Forecast::DataPoint>> Forecast::retrieve(const Position &position) {
-    // TODO make return type std::optional<std::vector<Forecast::DataPoint>>
     json weather;
     if (load_file) {
         weather = load_forecast(*load_file);
     } else {
-        weather = fetch_forecast(position);
+        if (auto fetched = fetch_forecast(position)) {
+            weather = *fetched;
+        } else {
+            return std::nullopt;
+        }
     }
 
     if (store_file) {
@@ -91,9 +95,8 @@ std::optional<std::vector<Forecast::DataPoint>> Forecast::retrieve(const Positio
     return hours;
 }
 
-nlohmann::json Forecast::fetch_forecast(const Position &pos) {
-    // TODO: Read longtidue and latitude from some kind of settings file
-    // TODO: Could also position from netatmo
+std::optional<nlohmann::json> Forecast::fetch_forecast(const Position &pos) {
+    char errbuf[CURL_ERROR_SIZE]{};
     const std::string url = fmt::format(
         "https://opendata-download-metfcst.smhi.se"
         "/api/category/pmp3g/version/2/geotype/point/lon/{}/lat/{}/data.json",
@@ -107,9 +110,12 @@ nlohmann::json Forecast::fetch_forecast(const Position &pos) {
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     std::string forecast_data{};
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &forecast_data);
-    curl_easy_perform(curl);
+    CURLcode err = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
-    // TODO Check if this keeps connection open.
+
+    if (err != CURLE_OK) {
+        return std::nullopt;
+    }
 
     return json::parse(forecast_data);
 }

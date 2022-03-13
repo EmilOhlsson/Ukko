@@ -138,21 +138,28 @@ int run(const Options &options) {
 
     bool refresh = false;
     for (uint32_t i = 0; options.cycles == 0 || i < options.cycles; i++) {
+        if (refresh) {
+            weather.refresh_authentication();
+        }
+
+        Weather::MeasuredData mdp = weather.retrieve();
+        const Position pos = weather.get_position();
+        // TODO: Handle optional forecast here
+        std::optional<std::vector<Forecast::DataPoint>> dps = forecast.retrieve(pos);
+
+        if (dps) {
+            screen.draw(*dps, mdp);
+        } else {
+            std::this_thread::sleep_for(options.retry_sleep);
+            continue;
+        }
+
         log("Waking display");
         display.wake_up();
 
         log("Clearing display");
         display.clear();
         std::this_thread::sleep_for(500ms);
-
-        if (refresh) {
-            weather.refresh_authentication();
-        }
-        Weather::MeasuredData mdp = weather.retrieve();
-        const Position pos = weather.get_position();
-        // TODO: Handle optional forecast here
-        std::vector<Forecast::DataPoint> dps = *forecast.retrieve(pos);
-        screen.draw(dps, mdp);
 
         display.render(screen.get_ptr());
         log("Drawing framebuffer");

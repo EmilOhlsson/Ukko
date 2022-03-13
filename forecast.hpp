@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <chrono>
-#include <curl/curl.h>
 #include <optional>
 #include <string>
 #include <vector>
@@ -34,12 +33,11 @@ struct Forecast {
     uint32_t load_index{};
     uint32_t store_index{};
 
-    char errbuf[CURL_ERROR_SIZE]{};
     std::vector<DataPoint> data_points{};
 
     json load_forecast(const std::string &filename);
 
     void store_forecast(const std::string &filename, const json &j);
 
-    json fetch_forecast(const Position &pos);
+    std::optional<json> fetch_forecast(const Position &pos);
 };

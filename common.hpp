@@ -79,6 +79,7 @@ struct Options {
     std::string settings_file = "/etc/ukko.lua";
 
     std::chrono::minutes sleep{60};
+    std::chrono::minutes retry_sleep{5};
     bool verbose = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;
     std::string spi_device = "/dev/spidev0.0";
