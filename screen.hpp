@@ -4,7 +4,9 @@
 #include <cairomm/enums.h>
 #include <cairomm/surface.h>
 #include <cairommconfig.h>
+#include <fmt/chrono.h>
 #include <fmt/core.h>
+#include <fmt/ranges.h>
 
 #include <algorithm>
 #include <iterator>

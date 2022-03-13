@@ -150,7 +150,8 @@ int run(const Options &options) {
         }
         Weather::MeasuredData mdp = weather.retrieve();
         const Position pos = weather.get_position();
-        std::vector<Forecast::DataPoint> dps = forecast.retrieve(pos);
+        // TODO: Handle optional forecast here
+        std::vector<Forecast::DataPoint> dps = *forecast.retrieve(pos);
         screen.draw(dps, mdp);
 
         display.render(screen.get_ptr());
