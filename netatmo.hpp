@@ -1,8 +1,9 @@
 #pragma once
 
-#include <curl/curl.h>
+#include <optional>
 #include <string>
 
+#include "common.hpp"
 #include "nlohmann/json.hpp"
 #include "settings.hpp"
 
@@ -16,7 +17,7 @@ struct Weather {
     /**
      * Return position reported by Netatmo
      */
-    Position get_position() const;
+    [[nodiscard]] std::optional<Position> get_position() const;
 
     /**
      * Container for weather measurements from
@@ -39,25 +40,25 @@ struct Weather {
      * Takes a sleep time, and returns the shortest of the given time, and the time until next
      * refresh
      */
-    std::chrono::minutes check_sleep(std::chrono::minutes sleep_time);
+    [[nodiscard]] std::chrono::minutes check_sleep(std::chrono::minutes sleep_time);
 
-    MeasuredData retrieve();
+    [[nodiscard]] std::optional<MeasuredData> retrieve();
 
     /**
      * Authenticate against netatmo API
      */
-    void authenticate();
+    [[nodiscard]] bool authenticate();
 
     /**
      * Refresh the authentication token
      */
-    void refresh_authentication();
+    [[nodiscard]] bool refresh_authentication();
 
   private:
     /**
      * Parse JSON authentication result
      */
-    void process_authentication_result(json auth);
+    [[nodiscard]] bool process_authentication_result(json auth);
 
     /**
      * Fetch device data from the `getstationsdata` API and return as JSON object
@@ -75,15 +76,15 @@ struct Weather {
     void store_data(const std::string &filename, const json &j);
 
     /* Position reported by Netatmo */
+    bool has_position{false};
     std::string longitude{};
     std::string latitude{};
 
     /* Used for curl error messages */
-    char errbuf[CURL_ERROR_SIZE]{};
 
     /* Operation configuration */
     const Options &options;
-    const Logger log = options.get_logger(Logger::Facility::Weather);
+    const Logger log = options.get_logger(Logger::Facility::Weather, true);
 
     /* Used for handling dummy data */
     std::optional<std::string> load_file{};

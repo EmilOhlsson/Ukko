@@ -26,21 +26,24 @@ size_t write_cb(void *data, size_t size, size_t nmemb, void *userp) {
     return nmemb;
 }
 } // namespace
-// TODO: There is basically no error handling going on here, that should be fixed
 
 Weather::Weather(const Options &options)
     : options(options), load_file(options.netatmo_load), store_file(options.netatmo_store) {
-    authenticate();
+    std::ignore = authenticate();
 }
 
 /**
  * Return position reported by Netatmo
  */
-Position Weather::get_position() const {
-    return Position{
-        .longitude = longitude,
-        .latitude = latitude,
-    };
+std::optional<Position> Weather::get_position() const {
+    if (has_position) {
+        return Position{
+            .longitude = longitude,
+            .latitude = latitude,
+        };
+    } else {
+        return std::nullopt;
+    }
 }
 
 /**
@@ -59,17 +62,18 @@ std::chrono::minutes Weather::check_sleep(std::chrono::minutes sleep_time) {
         std::chrono::duration_cast<std::chrono::minutes>(until_expiration), sleep_time);
 }
 
-Weather::MeasuredData Weather::retrieve() {
+std::optional<Weather::MeasuredData> Weather::retrieve() {
     json device_data = fetch_device_data();
     json device_list = device_data["body"]["devices"];
     if (device_list.size() != 1) {
-        throw std::runtime_error(
-            fmt::format("Invalid amount of devices, should be 1, got {}", device_list.size()));
+        log("Invalid amount of devices, should be 1, got {}", device_list.size());
+        return std::nullopt;
     }
     json device = device_list[0];
 
     longitude = fmt::format("{}", device["place"]["location"][0].get<double>());
     latitude = fmt::format("{}", device["place"]["location"][1].get<double>());
+    has_position = true;
 
     json device_dashboard = device["dashboard_data"];
 
@@ -103,11 +107,11 @@ Weather::MeasuredData Weather::retrieve() {
 /**
  * Authenticate against netatmo API
  */
-void Weather::authenticate() {
+bool Weather::authenticate() {
     if (load_file) {
         log("Skipping authentication, as data is loaded from file");
         is_authenticated = true;
-        return;
+        return true;
     }
 
     CURL *curl = curl_easy_init();
@@ -139,6 +143,7 @@ void Weather::authenticate() {
     curl_mime_data(part, "read_station", CURL_ZERO_TERMINATED);
     curl_mime_name(part, "scope");
 
+    char errbuf[CURL_ERROR_SIZE]{};
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
@@ -156,24 +161,25 @@ void Weather::authenticate() {
 
     if (result != CURLE_OK) {
         log("Was not able to retrieve auth token. {}", response);
-        // TODO: Do something, gracefully
-        throw std::runtime_error("Something didn't work");
-    }
-    if (!json::accept(response)) {
-        throw std::runtime_error("Response is not a valid JSON");
+        return false;
     }
 
-    process_authentication_result(json::parse(response));
+    if (!json::accept(response)) {
+        log("Response is not a valid JSON");
+        return false;
+    }
+
+    return process_authentication_result(json::parse(response));
 }
 
 /**
  * Refresh the authentication token
  */
-void Weather::refresh_authentication() {
+bool Weather::refresh_authentication() {
     if (load_file) {
         log("Skipping authentication refresh, as data is loaded from file");
         is_authenticated = true;
-        return;
+        return true;
     }
 
     CURL *curl = curl_easy_init();
@@ -197,6 +203,7 @@ void Weather::refresh_authentication() {
     curl_mime_data(part, "refresh_token", CURL_ZERO_TERMINATED);
     curl_mime_name(part, "grant_type");
 
+    char errbuf[CURL_ERROR_SIZE]{};
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
@@ -214,22 +221,22 @@ void Weather::refresh_authentication() {
 
     if (result != CURLE_OK) {
         log("Was not able to retrieve auth token. {}", response);
-        // TODO: Do something, gracefully
-        throw std::runtime_error("Something didn't work");
+        return false;
     }
 
     if (!json::accept(response)) {
-        throw std::runtime_error("Response is not a valid JSON");
+        log("Response is not a valid JSON");
+        return false;
     }
 
-    process_authentication_result(json::parse(response));
+    return process_authentication_result(json::parse(response));
 }
 
-void Weather::process_authentication_result(json auth) {
+bool Weather::process_authentication_result(json auth) {
     if (auth.find("error") != auth.end()) {
         is_authenticated = false;
-        throw std::runtime_error(
-            fmt::format("There was an error requesting auth token: {}", auth["error"]));
+        log("There was an error requesting auth token: {}", auth["error"]);
+        return false;
     }
 
     access_token = auth["access_token"];
@@ -237,6 +244,7 @@ void Weather::process_authentication_result(json auth) {
     std::chrono::seconds expires_in{static_cast<long>(auth["expires_in"])};
 
     expiration_time = std::chrono::system_clock::now() + expires_in;
+    return true;
 }
 
 /**
@@ -250,6 +258,7 @@ nlohmann::json Weather::fetch_device_data() {
     CURL *curl = curl_easy_init();
     curl_slist *list = nullptr;
 
+    char errbuf[CURL_ERROR_SIZE]{};
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);

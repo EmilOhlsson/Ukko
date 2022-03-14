@@ -88,8 +88,8 @@ struct Options {
         return run_mode == RunMode::Dry;
     }
 
-    Logger get_logger(Logger::Facility facility) const {
-        return Logger(facility, verbose);
+    Logger get_logger(Logger::Facility facility, bool force_verbose = false) const {
+        return Logger(facility, verbose || force_verbose);
     }
 };
 

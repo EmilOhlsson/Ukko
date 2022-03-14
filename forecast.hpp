@@ -26,7 +26,7 @@ struct Forecast {
 
   private:
     const Options &options;
-    const Logger log = options.get_logger(Logger::Facility::Forecast);
+    const Logger log = options.get_logger(Logger::Facility::Forecast, true);
     std::optional<std::string> load_file{};
     std::optional<std::string> store_file{};
 

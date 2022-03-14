@@ -114,6 +114,7 @@ std::optional<nlohmann::json> Forecast::fetch_forecast(const Position &pos) {
     curl_easy_cleanup(curl);
 
     if (err != CURLE_OK) {
+        log("Was not able to fetch forecast: {}", errbuf);
         return std::nullopt;
     }
 

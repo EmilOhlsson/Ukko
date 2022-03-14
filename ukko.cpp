@@ -122,7 +122,7 @@ int main(int argc, char **argv) {
 int run(const Options &options) {
     using namespace std::literals::chrono_literals;
 
-    Logger log = options.get_logger(Logger::Facility::Ukko);
+    Logger log = options.get_logger(Logger::Facility::Ukko, true);
 
     Screen screen{options};
     hwif::Pins control_pins{
@@ -137,19 +137,45 @@ int run(const Options &options) {
     Forecast forecast{options};
 
     bool refresh = false;
+    bool reauthenticate = false;
+    uint32_t fail_count = 0;
     for (uint32_t i = 0; options.cycles == 0 || i < options.cycles; i++) {
+        if (fail_count > 10) {
+            log("Too much errors, giving up");
+            abort();
+        }
         if (refresh) {
-            weather.refresh_authentication();
+            if (not weather.refresh_authentication()) {
+                log("Was not able refresh authentication. Will retry authentication");
+                refresh = false;
+                reauthenticate = true;
+                fail_count += 1;
+                std::this_thread::sleep_for(options.retry_sleep);
+                continue;
+            }
+        }
+        if (reauthenticate) {
+            reauthenticate = !weather.authenticate();
+            if (reauthenticate) {
+                log("Was not able to authenticate, will retry");
+                fail_count += 1;
+                std::this_thread::sleep_for(options.retry_sleep);
+                continue;
+            }
         }
 
-        Weather::MeasuredData mdp = weather.retrieve();
-        const Position pos = weather.get_position();
-        // TODO: Handle optional forecast here
-        std::optional<std::vector<Forecast::DataPoint>> dps = forecast.retrieve(pos);
+        std::optional<Weather::MeasuredData> mdp = weather.retrieve();
+        const std::optional<Position> pos = weather.get_position();
 
-        if (dps) {
-            screen.draw(*dps, mdp);
+        std::optional<std::vector<Forecast::DataPoint>> dps =
+            pos ? forecast.retrieve(*pos) : std::nullopt;
+
+        if (dps && mdp) {
+            screen.draw(*dps, *mdp);
         } else {
+            log("Was unable to update screen, will try again soon. dps={}, mdp={}", dps.has_value(),
+                mdp.has_value());
+            fail_count += 1;
             std::this_thread::sleep_for(options.retry_sleep);
             continue;
         }
@@ -171,6 +197,7 @@ int run(const Options &options) {
         const std::chrono::minutes sleep = weather.check_sleep(options.sleep);
         refresh = sleep != options.sleep;
         std::this_thread::sleep_for(sleep);
+        fail_count = 0;
     }
 
     return 0;
