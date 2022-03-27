@@ -8,7 +8,7 @@ StartLimitBurst=5
 [Service]
 Type=simple
 Restart=on-failure
-RestartSec=60s
+RestartSec=900s
 ExecStart=/usr/bin/ukko
 
 [Install]

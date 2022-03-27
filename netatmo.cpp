@@ -69,39 +69,44 @@ std::optional<Weather::MeasuredData> Weather::retrieve() {
         log("Invalid amount of devices, should be 1, got {}", device_list.size());
         return std::nullopt;
     }
-    json device = device_list[0];
+    try {
+        json device = device_list[0];
 
-    longitude = fmt::format("{}", device["place"]["location"][0].get<double>());
-    latitude = fmt::format("{}", device["place"]["location"][1].get<double>());
-    has_position = true;
+        longitude = fmt::format("{}", device["place"]["location"][0].get<double>());
+        latitude = fmt::format("{}", device["place"]["location"][1].get<double>());
+        has_position = true;
 
-    json device_dashboard = device["dashboard_data"];
+        json device_dashboard = device["dashboard_data"];
 
-    MeasuredData md{};
-    md.indoor.now = device_dashboard["Temperature"].get<double>();
-    md.indoor.max = device_dashboard["max_temp"].get<double>();
-    md.indoor.min = device_dashboard["min_temp"].get<double>();
-    log("Read temperature now {}, min {}, max {}", md.indoor.now, md.indoor.min, md.indoor.max);
+        MeasuredData md{};
+        md.indoor.now = device_dashboard["Temperature"].get<double>();
+        md.indoor.max = device_dashboard["max_temp"].get<double>();
+        md.indoor.min = device_dashboard["min_temp"].get<double>();
+        log("Read temperature now {}, min {}, max {}", md.indoor.now, md.indoor.min, md.indoor.max);
 
-    for (const json &module : device["modules"]) {
-        std::string module_id = module["_id"].get<std::string>();
-        log("Looking at module: {}", module_id);
-        if (module_id == netatmo.modules.outdoor) {
-            json dashboard = module["dashboard_data"];
-            md.outdoor.now = dashboard["Temperature"].get<double>();
-            md.outdoor.min = dashboard["min_temp"].get<double>();
-            md.outdoor.max = dashboard["max_temp"].get<double>();
-            log("Presenting temperature: {}",
-                module["dashboard_data"]["Temperature"].get<double>());
-        } else if (module_id == netatmo.modules.rain) {
-            json dashboard = module["dashboard_data"];
-            md.rain.last_1h = dashboard["sum_rain_1"].get<double>();
-            md.rain.last_24h = dashboard["sum_rain_24"].get<double>();
-            log("Presenting rain: {}", module["dashboard_data"]["Rain"].get<double>());
+        for (const json &module : device["modules"]) {
+            std::string module_id = module["_id"].get<std::string>();
+            log("Looking at module: {}", module_id);
+            if (module_id == netatmo.modules.outdoor) {
+                json dashboard = module["dashboard_data"];
+                md.outdoor.now = dashboard["Temperature"].get<double>();
+                md.outdoor.min = dashboard["min_temp"].get<double>();
+                md.outdoor.max = dashboard["max_temp"].get<double>();
+                log("Presenting temperature: {}",
+                    module["dashboard_data"]["Temperature"].get<double>());
+            } else if (module_id == netatmo.modules.rain) {
+                json dashboard = module["dashboard_data"];
+                md.rain.last_1h = dashboard["sum_rain_1"].get<double>();
+                md.rain.last_24h = dashboard["sum_rain_24"].get<double>();
+                log("Presenting rain: {}", module["dashboard_data"]["Rain"].get<double>());
+            }
         }
-    }
 
-    return md;
+        return md;
+    } catch (const std::exception &e) {
+        log("There was an error parsing weather data: {}", e.what());
+        return std::nullopt;
+    }
 }
 
 /**
