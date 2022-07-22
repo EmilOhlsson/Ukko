@@ -131,7 +131,7 @@ class Screen {
         int block_size = 0;
         int blocks = 0;
         const int span = std::ceil(temperature_range.hi - temperature_range.lo);
-        constexpr int max_blocks = 5;
+        static constexpr int max_blocks = 5;
         for (const int bsize : {1, 2, 5, 10, 20, 50, 100}) {
             blocks = utils::div_ceil(span, bsize);
             if (blocks < max_blocks) {
@@ -159,7 +159,7 @@ class Screen {
         context->select_font_face("cairo:sans-serif", Cairo::FONT_SLANT_NORMAL,
                                   Cairo::FONT_WEIGHT_NORMAL);
         /* Draw the levels, and annotate them */
-        for (int l = input_range.lo; l <= input_range.hi; l++) {
+        for (int l = input_range.lo; l <= input_range.hi; l += block_size) {
             if (l == 0) {
                 /* Make zero line stand out */
                 context->set_line_width(2);
