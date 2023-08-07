@@ -1,16 +1,21 @@
+#include <condition_variable>
 #include <fmt/core.h>
 #include <getopt.h>
+#include <mutex>
 #include <optional>
+#include <thread>
 
 #include "common.hpp"
 #include "display.hpp"
 #include "forecast.hpp"
 #include "gpio.hpp"
 #include "hwif.hpp"
+#include "message_queue.hpp"
 #include "netatmo.hpp"
 #include "screen.hpp"
-
-int run(const Options &);
+#include "token-storage.hpp"
+#include "ukko.hpp"
+#include "web-server.hpp"
 
 int main(int argc, char **argv) {
     int c;
@@ -18,6 +23,7 @@ int main(int argc, char **argv) {
     const static option options_available[] = {
         {"dry-run", no_argument, nullptr, 'n'},
         {"verbose", no_argument, nullptr, 'v'},
+        {"debug-log", no_argument, nullptr, 'V'},
         {"help", no_argument, nullptr, 'h'},
         {"store-forecast", required_argument, nullptr, 'F'},
         {"load-forecast", required_argument, nullptr, 'f'},
@@ -26,6 +32,8 @@ int main(int argc, char **argv) {
         {"store-screen", required_argument, nullptr, 'p'},
         {"store-render", required_argument, nullptr, 'r'},
         {"sleep", required_argument, nullptr, 's'},
+        {"weather-frequency", required_argument, nullptr, 'W'},
+        {"forecast-frequency", required_argument, nullptr, 'Y'},
         {"cycles", required_argument, nullptr, 'c'},
         {"settings", required_argument, nullptr, 'i'},
         {},
@@ -35,6 +43,7 @@ int main(int argc, char **argv) {
         "Usage: ukko [flags]\n"
         " -n | --dry-run                   Do now write to HW interfaces\n"
         " -v | --verbose                   Run in verbose mode\n"
+        " -V | --debug-log                 Print debug messages\n"
         " -h | --help                      Print this message and exit\n"
         " -i | --settings <file>           Load settings from <file>\n"
         " -d | --load-device-data <file>   Load device data from <file>\n"
@@ -43,6 +52,8 @@ int main(int argc, char **argv) {
         " -F | --load-forecast <file>      Load forecast data from json formatted file\n"
         " -r | --store-render <file>       Store rendering to file\n"
         " -s | --sleep <minutes>           Number of minutes to sleep between refresh\n"
+        " -W | --weather-frequency <mins>  Minutes between weather measurements\n"
+        " -Y | --forecast-frequency <mins> Minutes between forecast\n"
         " -c | --cycles <cycles>           Number of frames to render before quitting\n"
         "                                  0 cycles means cycle forever\n"
         " -p | --store-screen <file>       Store screen as image file\n";
@@ -51,7 +62,8 @@ int main(int argc, char **argv) {
 
     while (true) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "c:d:D:nvhF:f:p:s:r:i:", &options_available[0], &option_index);
+        c = getopt_long(argc, argv, "c:d:D:nvVhF:f:p:s:r:i:W:Y:", &options_available[0],
+                        &option_index);
         if (c == -1) {
             break;
         }
@@ -67,6 +79,10 @@ int main(int argc, char **argv) {
 
             case 'v':
                 options_used.verbose = true;
+                break;
+
+            case 'V':
+                options_used.debug_log = true;
                 break;
 
             default:
@@ -93,6 +109,14 @@ int main(int argc, char **argv) {
                 options_used.sleep = std::chrono::minutes{atoi(optarg)};
                 break;
 
+            case 'W':
+                options_used.weather_frequency = std::chrono::minutes{atoi(optarg)};
+                break;
+
+            case 'Y':
+                options_used.forecast_frequency = std::chrono::minutes{atoi(optarg)};
+                break;
+
             case 'r':
                 options_used.render_store = optarg;
                 break;
@@ -116,88 +140,82 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    return run(options_used);
+    Settings settings{options_used};
+    Ukko ukko{std::move(settings)};
+
+    return ukko.run();
 }
 
-int run(const Options &options) {
+int Ukko::run() {
     using namespace std::literals::chrono_literals;
+    using namespace std::chrono;
 
-    Logger log = options.get_logger(Logger::Facility::Ukko, true);
+    MessageQueue<Auth> queue{settings};
+    WebServer wserver{settings, [&](const Auth &auth) { queue.push(auth); }};
+    wserver.start();
 
-    Screen screen{options};
-    hwif::Pins control_pins{
-        .reset = gpio::Output(options, gpio::Active::Low, 17, "eink-reset"),
-        .control = gpio::Output(options, gpio::Active::Low, 25, "eink-control"),
-        .busy = gpio::Input(options, 24, "eink-busy"),
-    };
-    hwif::Hwif m_hwif(options, control_pins);
-    Display display(options, m_hwif);
+    /* Main logic loop. This will run for a given amount of cycles, or forever. This will fetch
+     * weather measurements and forecast, and update display */
+    for (uint32_t i = 0; settings.cycles == 0 || i < settings.cycles; i++) {
+        bool update_screen = false;
+        const time_point<system_clock> now = system_clock::now();
 
-    Weather weather{options};
-    Forecast forecast{options};
+        /* Check if it's time to fetch new weather metrics */
+        if (weather_time + settings.weather_frequency < now) {
+            debug("Fetching current weather metrics");
+            if (std::optional<Weather::MeasuredData> mdp = weather_service.retrieve()) {
+                update_screen = true;
+                weather_data = mdp;
+                weather_time = now;
+                if (not position) {
+                    debug("Using position from Netatmo");
+                    position = mdp->position;
+                }
+            } else {
+                debug("Was not able to fetch weather metrics, clearing outdated measuerments");
+                weather_data = std::nullopt;
+            }
+        }
 
-    bool refresh = false;
-    bool reauthenticate = false;
-    uint32_t fail_count = 0;
-    for (uint32_t i = 0; options.cycles == 0 || i < options.cycles; i++) {
-        if (fail_count > 10) {
-            log("Too much errors, giving up");
+        /* NOTE: We can get position either from Netatmo, or from configuration files. If we don't
+         * have a position, and we don't have information about how to authenticate we can never
+         * learn the position. */
+        if (not position && weather_service.can_authenticate()) {
+            /* TODO: As this state means we cannot operate, we should notify something on the
+             * display indicating the broken state */
+            log("Doesn't have a proper position");
             abort();
         }
-        if (refresh) {
-            if (not weather.refresh_authentication()) {
-                log("Was not able refresh authentication. Will retry authentication");
-                refresh = false;
-                reauthenticate = true;
-                fail_count += 1;
-                std::this_thread::sleep_for(options.retry_sleep);
-                continue;
-            }
-        }
-        if (reauthenticate) {
-            reauthenticate = !weather.authenticate();
-            if (reauthenticate) {
-                log("Was not able to authenticate, will retry");
-                fail_count += 1;
-                std::this_thread::sleep_for(options.retry_sleep);
-                continue;
+
+        /* Fetch forecast if it's time. If we did get a new forecast make sure the display is
+         * updated with the new forecast */
+        if (forecast_time + settings.forecast_frequency < now) {
+            debug("Fetching forecast");
+            if (std::optional<std::vector<Forecast::DataPoint>> dps =
+                    forecast_service.retrieve(*position)) {
+                update_screen = true;
+                forecast_data = dps;
+                forecast_time = now;
+                debug("Will fetch next forecast {}", forecast_time + settings.forecast_frequency);
+            } else {
+                debug("Was not able to fetch forecast");
             }
         }
 
-        std::optional<Weather::MeasuredData> mdp = weather.retrieve();
-        const std::optional<Position> pos = weather.get_position();
+        /* We have new information to display */
+        if (update_screen) {
+            debug("Updating screen with new information");
+            screen.draw(forecast_data, weather_data);
+            display.draw(screen.get_ptr());
+        }
 
-        std::optional<std::vector<Forecast::DataPoint>> dps =
-            pos ? forecast.retrieve(*pos) : std::nullopt;
-
-        if (dps && mdp) {
-            screen.draw(*dps, *mdp);
+        if (std::optional<Auth> auth = queue.pop(now + settings.sleep)) {
+            debug("Have code, will attempt to authenticate: {}", *auth);
+            std::ignore = weather_service.authenticate(*auth);
         } else {
-            log("Was unable to update screen, will try again soon. dps={}, mdp={}", dps.has_value(),
-                mdp.has_value());
-            fail_count += 1;
-            std::this_thread::sleep_for(options.retry_sleep);
-            continue;
+            debug("Waited, refreshing authentication");
+            std::ignore = weather_service.refresh_authentication();
         }
-
-        log("Waking display");
-        display.wake_up();
-
-        log("Clearing display");
-        display.clear();
-        std::this_thread::sleep_for(500ms);
-
-        display.render(screen.get_ptr());
-        log("Drawing framebuffer");
-        display.draw();
-
-        log("Sleeping for {} minute(s)", options.sleep.count());
-        display.enter_sleep();
-
-        const std::chrono::minutes sleep = weather.check_sleep(options.sleep);
-        refresh = sleep != options.sleep;
-        std::this_thread::sleep_for(sleep);
-        fail_count = 0;
     }
 
     return 0;

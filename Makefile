@@ -3,6 +3,7 @@
 SRCS = $(wildcard *.cpp)
 HDRS = $(wildcard *.hpp)
 OBJS = $(SRCS:.cpp=.o)
+LIBS = cairomm-1.0 lua libcurl fmt libgpiod libmicrohttpd
 
 CC ?= g++
 CXX ?= g++
@@ -12,18 +13,20 @@ CXXFLAGS_sanitize = -fsanitize=address -fno-omit-frame-pointer
 CXXFLAGS_release = -O3
 CXXFLAGS_debug = -g -Og
 
-CXXFLAGS += -Wall -Wextra 
+CXXFLAGS += -Wall -Wextra -flto
 CXXFLAGS += -DDUMMY=$(DUMMY)
 CXXFLAGS += -MMD
 CXXFLAGS += -std=c++20
-CXXFLAGS += $$(pkg-config --cflags cairomm-1.0 lua libcurl)
+CXXFLAGS += $$(pkg-config --cflags $(LIBS))
 CXXFLAGS += $(CXXFLAGS_$(PROFILE))
 
 LDLIBS_sanitize += -static-libasan
-LDLIBS += -lstdc++ -lfmt -lgpiod $$(pkg-config --libs cairomm-1.0 lua libcurl) -lm
+LDLIBS += -lstdc++ $$(pkg-config --libs $(LIBS)) -lm
 LDLIBS += $(LDLIBS_$(PROFILE))
 
 LDFLAGS_sanitize = -fsanitize=address
+LDFLAGS_release = -O3
+LDFLAGS += -flto=auto
 LDFLAGS += $(LDFLAGS_$(PROFILE))
 
 PREFIX ?= /usr

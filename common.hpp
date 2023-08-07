@@ -4,6 +4,7 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <optional>
 #include <string>
@@ -17,31 +18,98 @@ enum class RunMode {
 
 struct Logger {
     enum class Facility {
-        Ukko,
-        Forecast,
-        Screen,
+        Curl,
+        CurlList,
+        CurlMime,
         Display,
-        Hwif,
+        Forecast,
         Gpio,
+        Hwif,
+        MessageQueue,
+        Screen,
+        Ukko,
         Weather,
+        WebConnection,
+        WebConnectionDump,
+        WebServer,
     };
 
-    Logger(Facility facility, bool verbose) : facility(facility), verbose(verbose) {
+    Logger(Facility facility, bool enabled) : facility(facility), enabled(enabled) {
     }
 
-    template <typename... Ts> void operator()(const std::string &fmt, Ts &&...args) const {
-        if (verbose) {
-            fmt::vprint(get_name() + ": " + fmt + "\n",
-                        fmt::make_args_checked<Ts...>(fmt, args...));
+    template <typename S, typename... Args> void operator()(const S &format, Args &&...args) const {
+        if (enabled) {
+            std::string message{fmt::vformat(format, fmt::make_format_args(args...))};
+#if FMT_VERSION < 90100
+            fmt::print("{}: {}\n", get_name(), message);
+#else
+            fmt::print("{}: {}\n", get_name(), fmt::styled(message, get_style()));
+#endif
         }
     }
 
   private:
     Facility facility;
-    bool verbose{};
+    bool enabled{};
 
-    std::string get_name() const {
+    fmt::text_style get_style() const {
         switch (facility) {
+            case Facility::Curl:
+                return fmt::fg(fmt::color::coral);
+
+            case Facility::CurlMime:
+                return fmt::fg(fmt::color::pink);
+
+            case Facility::CurlList:
+                return fmt::fg(fmt::color::blanched_almond);
+
+            case Facility::Ukko:
+                return fmt::fg(fmt::color::light_blue);
+
+            case Facility::Gpio:
+                return fmt::fg(fmt::color::red);
+
+            case Facility::Forecast:
+                return fmt::fg(fmt::color::light_cyan);
+
+            case Facility::Screen:
+                return fmt::fg(fmt::color::light_blue);
+
+            case Facility::Display:
+                return fmt::fg(fmt::color::purple);
+
+            case Facility::Hwif:
+                return fmt::fg(fmt::color::light_pink);
+
+            case Facility::MessageQueue:
+                return fmt::fg(fmt::color::crimson);
+
+            case Facility::Weather:
+                return fmt::fg(fmt::color::light_green);
+
+            case Facility::WebServer:
+                return fmt::fg(fmt::color::white);
+
+            case Facility::WebConnection:
+                return fmt::fg(fmt::color::green);
+
+            case Facility::WebConnectionDump:
+                return fmt::fg(fmt::color::gold);
+        }
+        return {};
+    }
+
+    std::string_view get_name() const {
+        switch (facility) {
+            case Facility::Curl:
+                return "Curl";
+
+            case Facility::CurlMime:
+                return "Curl::Mime";
+
+            case Facility::CurlList:
+                return "Curl::List";
+
             case Facility::Ukko:
                 return "Ukko";
 
@@ -49,7 +117,7 @@ struct Logger {
                 return "GPIO";
 
             case Facility::Forecast:
-                return "Weather";
+                return "Forecast";
 
             case Facility::Screen:
                 return "Screen";
@@ -60,12 +128,47 @@ struct Logger {
             case Facility::Hwif:
                 return "Hwif";
 
+            case Facility::MessageQueue:
+                return "MessageQueue";
+
             case Facility::Weather:
                 return "Weather";
+
+            case Facility::WebServer:
+                return "Web";
+
+            case Facility::WebConnection:
+                return "Web::Connection";
+
+            case Facility::WebConnectionDump:
+                return "Web::Connection::Dump";
         }
         return "Broken";
     }
 };
+
+struct Position {
+    std::string longitude;
+    std::string latitude;
+
+  private:
+    friend std::ostream &operator<<(std::ostream &ostream, const Position &self) {
+        ostream << "[longitude=" << self.longitude << ", latitude=" << self.latitude << "]";
+        return ostream;
+    }
+};
+template <> struct fmt::formatter<Position> : ostream_formatter {};
+
+struct Auth {
+    std::string code;
+    std::string redirect;
+
+    friend std::ostream &operator<<(std::ostream &ostream, const Auth &self) {
+        ostream << "[code=" << self.code << ", redirect=" << self.redirect << "]";
+        return ostream;
+    }
+};
+template <> struct fmt::formatter<Auth> : ostream_formatter {};
 
 struct Options {
     uint32_t cycles{};
@@ -80,7 +183,12 @@ struct Options {
 
     std::chrono::minutes sleep{60};
     std::chrono::minutes retry_sleep{5};
+    std::chrono::minutes forecast_frequency{120};
+    std::chrono::minutes weather_frequency{30};
+
+    bool dump_traffic = true;
     bool verbose = false;
+    bool debug_log = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;
     std::string spi_device = "/dev/spidev0.0";
 
@@ -88,14 +196,12 @@ struct Options {
         return run_mode == RunMode::Dry;
     }
 
-    Logger get_logger(Logger::Facility facility, bool force_verbose = false) const {
-        return Logger(facility, verbose || force_verbose);
+    Logger get_logger(Logger::Facility facility, bool force_enabled = false) const {
+        return Logger(facility, verbose || force_enabled);
     }
-};
-
-struct Position {
-    std::string longitude;
-    std::string latitude;
+    Logger get_debug_logger(Logger::Facility facility, bool force_enabled = false) const {
+        return Logger(facility, debug_log || force_enabled);
+    }
 };
 
 /* We're assuming A1 format, monochrome */
