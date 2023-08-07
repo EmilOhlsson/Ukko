@@ -85,6 +85,7 @@ struct Weather {
     /* Operation configuration */
     const Options &options;
     const Logger log = options.get_logger(Logger::Facility::Weather, true);
+    const Logger debug = options.get_logger(Logger::Facility::Weather, true);
 
     /* Used for handling dummy data */
     std::optional<std::string> load_file{};

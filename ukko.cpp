@@ -18,6 +18,7 @@ int main(int argc, char **argv) {
     const static option options_available[] = {
         {"dry-run", no_argument, nullptr, 'n'},
         {"verbose", no_argument, nullptr, 'v'},
+        {"debug-log", no_argument, nullptr, 'V'},
         {"help", no_argument, nullptr, 'h'},
         {"store-forecast", required_argument, nullptr, 'F'},
         {"load-forecast", required_argument, nullptr, 'f'},
@@ -35,6 +36,7 @@ int main(int argc, char **argv) {
         "Usage: ukko [flags]\n"
         " -n | --dry-run                   Do now write to HW interfaces\n"
         " -v | --verbose                   Run in verbose mode\n"
+        " -V | --debug-log                 Print debug messages\n"
         " -h | --help                      Print this message and exit\n"
         " -i | --settings <file>           Load settings from <file>\n"
         " -d | --load-device-data <file>   Load device data from <file>\n"
@@ -51,7 +53,7 @@ int main(int argc, char **argv) {
 
     while (true) {
         int option_index = 0;
-        c = getopt_long(argc, argv, "c:d:D:nvhF:f:p:s:r:i:", &options_available[0], &option_index);
+        c = getopt_long(argc, argv, "c:d:D:nvVhF:f:p:s:r:i:", &options_available[0], &option_index);
         if (c == -1) {
             break;
         }
@@ -67,6 +69,10 @@ int main(int argc, char **argv) {
 
             case 'v':
                 options_used.verbose = true;
+                break;
+
+            case 'V':
+                options_used.debug_log = true;
                 break;
 
             default:

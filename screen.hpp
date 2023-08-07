@@ -321,15 +321,20 @@ class Screen {
     /**
      * Draw forecast and measured values on screen
      */
-    void draw(const std::vector<Forecast::DataPoint> &dps, const Weather::MeasuredData &mdp) {
+    void draw(const std::optional<std::vector<Forecast::DataPoint>> &dps,
+              const std::optional<Weather::MeasuredData> &mdp) {
         // TODO: There might be a point in having parameters optional, as there could be a scenario
         //       where we didn't get any values.
         log("Drawing data points to screen");
         surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
         context = Cairo::Context::create(surface);
 
-        draw_values(mdp);
-        draw_forecast(dps, Area(Range(192, WIDTH - 10), Range(0, HEIGHT)));
+        if (mdp) {
+            draw_values(*mdp);
+        }
+        if (dps) {
+            draw_forecast(*dps, Area(Range(192, WIDTH - 10), Range(0, HEIGHT)));
+        }
 
         if (filename) {
             surface->write_to_png(fmt::format("{}-{}.png", *filename, render_number));

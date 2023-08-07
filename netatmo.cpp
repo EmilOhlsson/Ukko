@@ -25,6 +25,45 @@ size_t write_cb(void *data, size_t size, size_t nmemb, void *userp) {
     std::copy_n(bytes, nmemb, std::back_inserter(storage));
     return nmemb;
 }
+
+int trace_function(CURL * /*handle*/, curl_infotype type, char *data, size_t size,
+                   void * /*clientp*/) {
+    switch (type) {
+        case CURLINFO_TEXT:
+            fmt::print("** TEXT\n");
+            break;
+        case CURLINFO_DATA_OUT:
+            fmt::print("** DATA_OUT\n");
+            fmt::print("{}\n\n", data);
+            break;
+        case CURLINFO_SSL_DATA_OUT:
+            fmt::print("** SSL_DATA_OUT\n");
+            break;
+        case CURLINFO_HEADER_IN:
+            fmt::print("** HEADER_IN\n");
+            break;
+        case CURLINFO_HEADER_OUT:
+            fmt::print("** HEADER_OUT\n");
+            fmt::print("{}\n\n", data);
+            break;
+        case CURLINFO_DATA_IN:
+            fmt::print("** DATA_IN\n");
+            break;
+        case CURLINFO_SSL_DATA_IN:
+            fmt::print("** SSL_DATA_IN\n");
+            break;
+        default:
+            fmt::print("** unknown: {}\n", type);
+            break;
+    }
+    for (size_t i = 0; i < size; i++) {
+        if (i % 80 == 0 && i != 0)
+            fprintf(stderr, "\n");
+        fprintf(stderr, "%c", isgraph(data[i]) ? data[i] : '.');
+    }
+    fprintf(stderr, "\n");
+    return 0;
+}
 } // namespace
 
 Weather::Weather(const Options &options)
@@ -113,6 +152,7 @@ std::optional<Weather::MeasuredData> Weather::retrieve() {
  * Authenticate against netatmo API
  */
 bool Weather::authenticate() {
+    debug("Authenticating against Netatmo");
     if (load_file) {
         log("Skipping authentication, as data is loaded from file");
         is_authenticated = true;
@@ -238,9 +278,11 @@ bool Weather::refresh_authentication() {
 }
 
 bool Weather::process_authentication_result(json auth) {
+    debug("Processing authentication result from Netatmo");
     if (auth.find("error") != auth.end()) {
         is_authenticated = false;
         log("There was an error requesting auth token: {}", auth["error"]);
+        debug("authentication response: {}", auth.dump(2, ' '));
         return false;
     }
 
@@ -256,9 +298,12 @@ bool Weather::process_authentication_result(json auth) {
  * Fetch device data from the `getstationsdata` API and return as JSON object
  */
 nlohmann::json Weather::fetch_device_data() {
+    debug("Fetching device data");
     if (load_file) {
         return load_data(*load_file);
     }
+
+    assert(is_authenticated);
 
     CURL *curl = curl_easy_init();
     curl_slist *list = nullptr;

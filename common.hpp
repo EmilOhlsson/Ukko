@@ -26,19 +26,21 @@ struct Logger {
         Weather,
     };
 
-    Logger(Facility facility, bool verbose) : facility(facility), verbose(verbose) {
+    Logger(Facility facility, bool enabled)
+        : facility(facility), enabled(enabled), style{fmt::fg(fmt::color::blue)} {
     }
 
-    template <typename... Ts> void operator()(const std::string &fmt, Ts &&...args) const {
-        if (verbose) {
-            fmt::vprint(get_name() + ": " + fmt + "\n",
-                        fmt::make_args_checked<Ts...>(fmt, args...));
+    template <typename S, typename... Args> void operator()(const S &format, Args &&...args) const {
+        if (enabled) {
+            std::string message{fmt::vformat(format, fmt::make_format_args(args...))};
+            fmt::print("{}: {}\n", get_name(), fmt::styled(message, style));
         }
     }
 
   private:
     Facility facility;
-    bool verbose{};
+    bool enabled{};
+    fmt::text_style style;
 
     std::string get_name() const {
         switch (facility) {
@@ -81,6 +83,7 @@ struct Options {
     std::chrono::minutes sleep{60};
     std::chrono::minutes retry_sleep{5};
     bool verbose = false;
+    bool debug_log = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;
     std::string spi_device = "/dev/spidev0.0";
 
@@ -88,8 +91,11 @@ struct Options {
         return run_mode == RunMode::Dry;
     }
 
-    Logger get_logger(Logger::Facility facility, bool force_verbose = false) const {
-        return Logger(facility, verbose || force_verbose);
+    Logger get_logger(Logger::Facility facility, bool force_enabled = false) const {
+        return Logger(facility, verbose || force_enabled);
+    }
+    Logger get_debug_logger(Logger::Facility facility, bool force_enabled = false) const {
+        return Logger(facility, debug_log || force_enabled);
     }
 };
 

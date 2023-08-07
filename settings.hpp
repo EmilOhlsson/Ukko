@@ -1,6 +1,7 @@
 #pragma once
 
 #include <fmt/core.h>
+#include <optional>
 #include <vector>
 
 extern "C" {
@@ -38,6 +39,10 @@ struct Settings {
             std::string rain;
         } modules;
     } netatmo;
+
+    struct Misc {
+        std::optional<std::string> position;
+    } misc;
 
   private:
     // TODO: Generalize this approach not always look at top of stack,
