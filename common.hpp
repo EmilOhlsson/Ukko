@@ -32,7 +32,11 @@ struct Logger {
     template <typename S, typename... Args> void operator()(const S &format, Args &&...args) const {
         if (enabled) {
             std::string message{fmt::vformat(format, fmt::make_format_args(args...))};
+#if FMT_VERSION < 90100
+            fmt::print("{}: {}\n", get_name(), message);
+#else
             fmt::print("{}: {}\n", get_name(), fmt::styled(message, get_style()));
+#endif
         }
     }
     // void operator()(const fmt::format_string<Ts...> &fmt, Ts &&...args) const {
