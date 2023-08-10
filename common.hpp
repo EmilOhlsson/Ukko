@@ -26,21 +26,55 @@ struct Logger {
         Weather,
     };
 
-    Logger(Facility facility, bool enabled)
-        : facility(facility), enabled(enabled), style{fmt::fg(fmt::color::blue)} {
+    Logger(Facility facility, bool enabled) : facility(facility), enabled(enabled) {
     }
 
     template <typename S, typename... Args> void operator()(const S &format, Args &&...args) const {
         if (enabled) {
             std::string message{fmt::vformat(format, fmt::make_format_args(args...))};
-            fmt::print("{}: {}\n", get_name(), fmt::styled(message, style));
+            fmt::print("{}: {}\n", get_name(), fmt::styled(message, get_style()));
         }
     }
+    // void operator()(const fmt::format_string<Ts...> &fmt, Ts &&...args) const {
+    //     if (verbose) {
+    //         //fmt::v7::vprint(get_name() + ": " + fmt + "\n",
+    //         //        fmt::v7::make_args_checked<Ts...>(fmt, args...));
+    //         fmt::print("{}: ", get_name());
+    //         fmt::vprint(fmt, fmt::make_format_args(fmt, args...));
+    //         fmt::print("\n");
+    //     fmt::v9::print("DINK DINK DINK!\n");
+    //     }
+    // }
 
   private:
     Facility facility;
     bool enabled{};
-    fmt::text_style style;
+
+    fmt::text_style get_style() const {
+        switch (facility) {
+            case Facility::Ukko:
+                return fmt::fg(fmt::color::light_blue);
+
+            case Facility::Gpio:
+                return fmt::fg(fmt::color::red);
+
+            case Facility::Forecast:
+                return fmt::fg(fmt::color::light_cyan);
+
+            case Facility::Screen:
+                return fmt::fg(fmt::color::light_blue);
+
+            case Facility::Display:
+                return fmt::fg(fmt::color::purple);
+
+            case Facility::Hwif:
+                return fmt::fg(fmt::color::light_pink);
+
+            case Facility::Weather:
+                return fmt::fg(fmt::color::light_green);
+        }
+        return {};
+    }
 
     std::string get_name() const {
         switch (facility) {
@@ -69,6 +103,11 @@ struct Logger {
     }
 };
 
+struct Position {
+    std::string longitude;
+    std::string latitude;
+};
+
 struct Options {
     uint32_t cycles{};
     std::optional<std::string> forecast_load{};
@@ -82,6 +121,9 @@ struct Options {
 
     std::chrono::minutes sleep{60};
     std::chrono::minutes retry_sleep{5};
+    std::chrono::minutes forecast_frequency{120};
+    std::chrono::minutes weather_frequency{30};
+
     bool verbose = false;
     bool debug_log = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;
@@ -97,11 +139,6 @@ struct Options {
     Logger get_debug_logger(Logger::Facility facility, bool force_enabled = false) const {
         return Logger(facility, debug_log || force_enabled);
     }
-};
-
-struct Position {
-    std::string longitude;
-    std::string latitude;
 };
 
 /* We're assuming A1 format, monochrome */

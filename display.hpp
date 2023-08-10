@@ -105,7 +105,7 @@ struct Display {
     /**
      * Render framebuffer to screen
      */
-    void draw() {
+    void paint_framebuffer() {
         using namespace hwif;
 
         log("Drawing framebuffer to display");
@@ -142,6 +142,23 @@ struct Display {
             byte = (byte & 0xaa) >> 1 | (byte & ~0xaa) << 1;
             return byte;
         });
+    }
+
+    void draw(const std::span<uint8_t, IMG_SIZE> data) {
+        using namespace std::literals::chrono_literals;
+        log("Waking display");
+        wake_up();
+
+        log("Clearing display");
+        clear();
+        std::this_thread::sleep_for(500ms);
+
+        render(data);
+        log("Drawing framebuffer");
+        paint_framebuffer();
+
+        log("Sleeping for {} minute(s)", options.sleep.count());
+        enter_sleep();
     }
 
   private:

@@ -4,16 +4,18 @@
 #include <optional>
 #include <vector>
 
+#include "common.hpp"
+
 extern "C" {
 #include <lauxlib.h>
 #include <lua.h>
 #include <lualib.h>
 }
 
-struct Settings {
+struct Settings : public Options {
     // TODO: Would probably make sense to merge this with options.
     //       could have this class extend options.
-    Settings(const std::string &settings_file) {
+    Settings(const Options &options) : Options{options} {
         LuaFile file(settings_file);
 
         LuaTable netatmo_config = file.get_table("netatmo");
@@ -26,6 +28,18 @@ struct Settings {
         LuaTable modules = netatmo_config.get_table_field("modules");
         netatmo.modules.outdoor = modules.get_string_field("outdoor");
         netatmo.modules.rain = modules.get_string_field("rain");
+
+        try {
+            LuaTable position_table = file.get_table("position");
+            std::string longitude = position_table.get_string_field("longitude");
+            std::string latitude = position_table.get_string_field("latitude");
+            position = Position{
+                .longitude = longitude,
+                .latitude = latitude,
+            };
+        } catch (const std::runtime_error &err) {
+            fmt::print("No (valid) position provided, will use netatmo position\n");
+        }
     }
 
     struct Netatmo {
@@ -40,9 +54,7 @@ struct Settings {
         } modules;
     } netatmo;
 
-    struct Misc {
-        std::optional<std::string> position;
-    } misc;
+    std::optional<Position> position{};
 
   private:
     // TODO: Generalize this approach not always look at top of stack,

@@ -12,12 +12,7 @@
 struct Weather {
     using json = nlohmann::json;
 
-    Weather(const Options &options);
-
-    /**
-     * Return position reported by Netatmo
-     */
-    [[nodiscard]] std::optional<Position> get_position() const;
+    Weather(const Settings &settings);
 
     /**
      * Container for weather measurements from
@@ -34,6 +29,7 @@ struct Weather {
         };
         Temperature outdoor;
         Temperature indoor;
+        Position position;
     };
 
     /**
@@ -53,6 +49,14 @@ struct Weather {
      * Refresh the authentication token
      */
     [[nodiscard]] bool refresh_authentication();
+
+    /**
+     * Check if it is even possible to authenticate
+     */
+    [[nodiscard]] bool can_authenticate() const {
+        // TODO: Once we handle tokens change this
+        return false;
+    }
 
   private:
     /**
@@ -75,17 +79,11 @@ struct Weather {
      */
     void store_data(const std::string &filename, const json &j);
 
-    /* Position reported by Netatmo */
-    bool has_position{false};
-    std::string longitude{};
-    std::string latitude{};
-
-    /* Used for curl error messages */
-
     /* Operation configuration */
-    const Options &options;
-    const Logger log = options.get_logger(Logger::Facility::Weather, true);
-    const Logger debug = options.get_logger(Logger::Facility::Weather, true);
+    const Settings &settings;
+    const Logger log = settings.get_logger(Logger::Facility::Weather, true);
+    const Logger debug = settings.get_logger(Logger::Facility::Weather, true);
+    const Settings::Netatmo &netatmo = settings.netatmo;
 
     /* Used for handling dummy data */
     std::optional<std::string> load_file{};
@@ -96,8 +94,6 @@ struct Weather {
     bool is_authenticated = false;
 
     /* Settings handling */
-    const Settings settings{options.settings_file};
-    const Settings::Netatmo &netatmo = settings.netatmo;
 
     /* Authentication data */
     std::string access_token{};

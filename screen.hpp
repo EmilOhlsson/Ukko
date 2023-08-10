@@ -313,6 +313,8 @@ class Screen {
         context->show_text("Regn (mm), 1h/24h");
     }
 
+    uint32_t render_number = 0;
+
   public:
     Screen(const Options &options) : options(options), filename(options.render_store) {
         context->set_source_rgba(0.0, 0.0, 0.0, 1.0);
@@ -323,8 +325,6 @@ class Screen {
      */
     void draw(const std::optional<std::vector<Forecast::DataPoint>> &dps,
               const std::optional<Weather::MeasuredData> &mdp) {
-        // TODO: There might be a point in having parameters optional, as there could be a scenario
-        //       where we didn't get any values.
         log("Drawing data points to screen");
         surface = Cairo::ImageSurface::create(FORMAT, WIDTH, HEIGHT);
         context = Cairo::Context::create(surface);
@@ -333,7 +333,7 @@ class Screen {
             draw_values(*mdp);
         }
         if (dps) {
-            draw_forecast(*dps, Area(Range(192, WIDTH - 10), Range(0, HEIGHT)));
+            draw_forecast(*dps, Area(Range(mdp ? 192 : 40, WIDTH - 10), Range(0, HEIGHT)));
         }
 
         if (filename) {
@@ -345,5 +345,4 @@ class Screen {
     std::span<uint8_t, IMG_SIZE> get_ptr() {
         return std::span<uint8_t, IMG_SIZE>{surface->get_data(), IMG_SIZE};
     }
-    uint32_t render_number = 0;
 };

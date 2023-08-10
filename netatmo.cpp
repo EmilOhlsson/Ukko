@@ -66,23 +66,8 @@ int trace_function(CURL * /*handle*/, curl_infotype type, char *data, size_t siz
 }
 } // namespace
 
-Weather::Weather(const Options &options)
-    : options(options), load_file(options.netatmo_load), store_file(options.netatmo_store) {
-    std::ignore = authenticate();
-}
-
-/**
- * Return position reported by Netatmo
- */
-std::optional<Position> Weather::get_position() const {
-    if (has_position) {
-        return Position{
-            .longitude = longitude,
-            .latitude = latitude,
-        };
-    } else {
-        return std::nullopt;
-    }
+Weather::Weather(const Settings &settings)
+    : settings(settings), load_file(settings.netatmo_load), store_file(settings.netatmo_store) {
 }
 
 /**
@@ -102,7 +87,9 @@ std::chrono::minutes Weather::check_sleep(std::chrono::minutes sleep_time) {
 }
 
 std::optional<Weather::MeasuredData> Weather::retrieve() {
+    return std::nullopt;
     json device_data = fetch_device_data();
+    fmt::print("Got: {}\n", device_data.dump(2, ' '));
     json device_list = device_data["body"]["devices"];
     if (device_list.size() != 1) {
         log("Invalid amount of devices, should be 1, got {}", device_list.size());
@@ -111,16 +98,21 @@ std::optional<Weather::MeasuredData> Weather::retrieve() {
     try {
         json device = device_list[0];
 
-        longitude = fmt::format("{}", device["place"]["location"][0].get<double>());
-        latitude = fmt::format("{}", device["place"]["location"][1].get<double>());
-        has_position = true;
-
         json device_dashboard = device["dashboard_data"];
 
-        MeasuredData md{};
-        md.indoor.now = device_dashboard["Temperature"].get<double>();
-        md.indoor.max = device_dashboard["max_temp"].get<double>();
-        md.indoor.min = device_dashboard["min_temp"].get<double>();
+        MeasuredData md{
+            .rain{},
+            .outdoor{},
+            .indoor{
+                .now = device_dashboard["Temperature"].get<double>(),
+                .min = device_dashboard["min_temp"].get<double>(),
+                .max = device_dashboard["max_temp"].get<double>(),
+            },
+            .position{
+                .longitude = fmt::format("{}", device["place"]["location"][0].get<double>()),
+                .latitude = fmt::format("{}", device["place"]["location"][1].get<double>()),
+            },
+        };
         log("Read temperature now {}, min {}, max {}", md.indoor.now, md.indoor.min, md.indoor.max);
 
         for (const json &module : device["modules"]) {
@@ -153,6 +145,7 @@ std::optional<Weather::MeasuredData> Weather::retrieve() {
  */
 bool Weather::authenticate() {
     debug("Authenticating against Netatmo");
+    return false;
     if (load_file) {
         log("Skipping authentication, as data is loaded from file");
         is_authenticated = true;
@@ -192,14 +185,35 @@ bool Weather::authenticate() {
     curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
     curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
+    if (settings.debug_log) {
+        curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, trace_function);
+    }
 
-    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    // TODO: create unique ptr for curl_easy_escape
+    char *username = curl_easy_escape(curl, netatmo.username.c_str(), 0);
+    char *password = curl_easy_escape(curl, netatmo.password.c_str(), 0);
+    std::ostringstream oss;
+    oss << "grant_type=password";
+    oss << "&client_id=" << netatmo.client_id;
+    oss << "&client_secret=" << netatmo.client_secret;
+    oss << "&username=" << username;
+    oss << "&password=" << password;
+    oss << "&scope=read_station";
+    curl_free(username);
+    curl_free(password);
+    std::string postdata = oss.str();
+
+    // curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str());
     curl_easy_setopt(curl, CURLOPT_URL, "https://api.netatmo.com/oauth2/token");
+    // curl_easy_setopt(curl, CURLOPT_URL, "localhost:8000");
 
     std::string response{};
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
 
+    debug("Performing authentication");
     CURLcode result = curl_easy_perform(curl);
     curl_easy_cleanup(curl);
     curl_mime_free(mime);
@@ -221,6 +235,8 @@ bool Weather::authenticate() {
  * Refresh the authentication token
  */
 bool Weather::refresh_authentication() {
+    // TODO: do not authenticate
+    return true;
     if (load_file) {
         log("Skipping authentication refresh, as data is loaded from file");
         is_authenticated = true;
