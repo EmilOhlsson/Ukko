@@ -39,16 +39,6 @@ struct Logger {
 #endif
         }
     }
-    // void operator()(const fmt::format_string<Ts...> &fmt, Ts &&...args) const {
-    //     if (verbose) {
-    //         //fmt::v7::vprint(get_name() + ": " + fmt + "\n",
-    //         //        fmt::v7::make_args_checked<Ts...>(fmt, args...));
-    //         fmt::print("{}: ", get_name());
-    //         fmt::vprint(fmt, fmt::make_format_args(fmt, args...));
-    //         fmt::print("\n");
-    //     fmt::v9::print("DINK DINK DINK!\n");
-    //     }
-    // }
 
   private:
     Facility facility;

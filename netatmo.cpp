@@ -152,83 +152,83 @@ bool Weather::authenticate() {
         return true;
     }
 
-    CURL *curl = curl_easy_init();
-
-    curl_mime *mime = curl_mime_init(curl);
-    curl_mimepart *part;
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, netatmo.client_id.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "client_id");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, netatmo.client_secret.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "client_secret");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, netatmo.username.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "username");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, netatmo.password.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "password");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, "password", CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "grant_type");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, "read_station", CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "scope");
-
-    char errbuf[CURL_ERROR_SIZE]{};
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
-    if (settings.debug_log) {
-        curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, trace_function);
-    }
-
-    // TODO: create unique ptr for curl_easy_escape
-    char *username = curl_easy_escape(curl, netatmo.username.c_str(), 0);
-    char *password = curl_easy_escape(curl, netatmo.password.c_str(), 0);
-    std::ostringstream oss;
-    oss << "grant_type=password";
-    oss << "&client_id=" << netatmo.client_id;
-    oss << "&client_secret=" << netatmo.client_secret;
-    oss << "&username=" << username;
-    oss << "&password=" << password;
-    oss << "&scope=read_station";
-    curl_free(username);
-    curl_free(password);
-    std::string postdata = oss.str();
-
-    // curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
-    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str());
-    curl_easy_setopt(curl, CURLOPT_URL, "https://api.netatmo.com/oauth2/token");
-    // curl_easy_setopt(curl, CURLOPT_URL, "localhost:8000");
-
-    std::string response{};
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-    debug("Performing authentication");
-    CURLcode result = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    curl_mime_free(mime);
-
-    if (result != CURLE_OK) {
-        log("Was not able to retrieve auth token. {}", response);
-        return false;
-    }
-
-    if (!json::accept(response)) {
-        log("Response is not a valid JSON");
-        return false;
-    }
-
-    return process_authentication_result(json::parse(response));
+//    CURL *curl = curl_easy_init();
+//
+//    curl_mime *mime = curl_mime_init(curl);
+//    curl_mimepart *part;
+//
+//    part = curl_mime_addpart(mime);
+//    curl_mime_data(part, netatmo.client_id.c_str(), CURL_ZERO_TERMINATED);
+//    curl_mime_name(part, "client_id");
+//
+//    part = curl_mime_addpart(mime);
+//    curl_mime_data(part, netatmo.client_secret.c_str(), CURL_ZERO_TERMINATED);
+//    curl_mime_name(part, "client_secret");
+//
+//    part = curl_mime_addpart(mime);
+//    curl_mime_data(part, netatmo.username.c_str(), CURL_ZERO_TERMINATED);
+//    curl_mime_name(part, "username");
+//
+//    part = curl_mime_addpart(mime);
+//    curl_mime_data(part, netatmo.password.c_str(), CURL_ZERO_TERMINATED);
+//    curl_mime_name(part, "password");
+//
+//    part = curl_mime_addpart(mime);
+//    curl_mime_data(part, "password", CURL_ZERO_TERMINATED);
+//    curl_mime_name(part, "grant_type");
+//
+//    part = curl_mime_addpart(mime);
+//    curl_mime_data(part, "read_station", CURL_ZERO_TERMINATED);
+//    curl_mime_name(part, "scope");
+//
+//    char errbuf[CURL_ERROR_SIZE]{};
+//    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
+//    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
+//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
+//    if (settings.debug_log) {
+//        curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, trace_function);
+//    }
+//
+//    // TODO: create unique ptr for curl_easy_escape
+//    char *username = curl_easy_escape(curl, netatmo.username.c_str(), 0);
+//    char *password = curl_easy_escape(curl, netatmo.password.c_str(), 0);
+//    std::ostringstream oss;
+//    oss << "grant_type=password";
+//    oss << "&client_id=" << netatmo.client_id;
+//    oss << "&client_secret=" << netatmo.client_secret;
+//    oss << "&username=" << username;
+//    oss << "&password=" << password;
+//    oss << "&scope=read_station";
+//    curl_free(username);
+//    curl_free(password);
+//    std::string postdata = oss.str();
+//
+//    // curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
+//    curl_easy_setopt(curl, CURLOPT_POST, 1L);
+//    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str());
+//    curl_easy_setopt(curl, CURLOPT_URL, "https://api.netatmo.com/oauth2/token");
+//    // curl_easy_setopt(curl, CURLOPT_URL, "localhost:8000");
+//
+//    std::string response{};
+//    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
+//    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
+//
+//    debug("Performing authentication");
+//    CURLcode result = curl_easy_perform(curl);
+//    curl_easy_cleanup(curl);
+//    curl_mime_free(mime);
+//
+//    if (result != CURLE_OK) {
+//        log("Was not able to retrieve auth token. {}", response);
+//        return false;
+//    }
+//
+//    if (!json::accept(response)) {
+//        log("Response is not a valid JSON");
+//        return false;
+//    }
+//
+//    return process_authentication_result(json::parse(response));
 }
 
 /**

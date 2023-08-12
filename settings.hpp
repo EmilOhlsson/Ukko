@@ -19,9 +19,7 @@ struct Settings : public Options {
         LuaFile file(settings_file);
 
         LuaTable netatmo_config = file.get_table("netatmo");
-        netatmo.password = netatmo_config.get_string_field("password");
         netatmo.client_id = netatmo_config.get_string_field("client_id");
-        netatmo.username = netatmo_config.get_string_field("username");
         netatmo.client_secret = netatmo_config.get_string_field("client_secret");
         netatmo.device_id = netatmo_config.get_string_field("device_id");
 
@@ -43,9 +41,7 @@ struct Settings : public Options {
     }
 
     struct Netatmo {
-        std::string password;
         std::string client_id;
-        std::string username;
         std::string client_secret;
         std::string device_id;
         struct Modules {
