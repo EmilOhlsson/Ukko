@@ -6,6 +6,7 @@
 #include "common.hpp"
 #include "nlohmann/json.hpp"
 #include "settings.hpp"
+#include "web.hpp"
 
 // TODO: There is basically no error handling going on here, that should be fixed
 
@@ -43,7 +44,7 @@ struct Weather {
     /**
      * Authenticate against netatmo API
      */
-    [[nodiscard]] bool authenticate();
+    [[nodiscard]] bool authenticate(const Auth& auth);
 
     /**
      * Refresh the authentication token
@@ -59,6 +60,7 @@ struct Weather {
     }
 
   private:
+    [[nodiscard]] bool get_token(const PostParams &params);
     /**
      * Parse JSON authentication result
      */
@@ -67,7 +69,7 @@ struct Weather {
     /**
      * Fetch device data from the `getstationsdata` API and return as JSON object
      */
-    json fetch_device_data();
+    std::optional<json> fetch_device_data();
 
     /**
      * Load json data from provided file, and increment file counter
@@ -99,4 +101,5 @@ struct Weather {
     std::string access_token{};
     std::string refresh_token{};
     std::chrono::time_point<std::chrono::system_clock> expiration_time{};
+
 };

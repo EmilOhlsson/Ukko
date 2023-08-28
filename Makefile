@@ -3,7 +3,7 @@
 SRCS = $(wildcard *.cpp)
 HDRS = $(wildcard *.hpp)
 OBJS = $(SRCS:.cpp=.o)
-LIBS = cairomm-1.0 lua libcurl fmt libgpiod
+LIBS = cairomm-1.0 lua libcurl fmt libgpiod libmicrohttpd
 
 CC ?= g++
 CXX ?= g++
@@ -25,7 +25,8 @@ LDLIBS += -lstdc++ $$(pkg-config --libs $(LIBS)) -lm
 LDLIBS += $(LDLIBS_$(PROFILE))
 
 LDFLAGS_sanitize = -fsanitize=address
-LDFLAGS += -flto
+LDFLAGS_release = -O3
+LDFLAGS += -flto=auto
 LDFLAGS += $(LDFLAGS_$(PROFILE))
 
 PREFIX ?= /usr

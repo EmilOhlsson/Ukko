@@ -9,62 +9,13 @@
 #include <unistd.h>
 
 #include "common.hpp"
+#include "web.hpp"
 
 #include "netatmo.hpp"
 #include "nlohmann/json.hpp"
 #include "settings.hpp"
 
-namespace {
-/**
- * Helper function for cURL. Append read data to a provided std::string
- */
-size_t write_cb(void *data, size_t size, size_t nmemb, void *userp) {
-    assert(size == 1);
-    const char *bytes = static_cast<char *>(data);
-    auto &storage = *static_cast<std::string *>(userp);
-    std::copy_n(bytes, nmemb, std::back_inserter(storage));
-    return nmemb;
-}
-
-int trace_function(CURL * /*handle*/, curl_infotype type, char *data, size_t size,
-                   void * /*clientp*/) {
-    switch (type) {
-        case CURLINFO_TEXT:
-            fmt::print("** TEXT\n");
-            break;
-        case CURLINFO_DATA_OUT:
-            fmt::print("** DATA_OUT\n");
-            fmt::print("{}\n\n", data);
-            break;
-        case CURLINFO_SSL_DATA_OUT:
-            fmt::print("** SSL_DATA_OUT\n");
-            break;
-        case CURLINFO_HEADER_IN:
-            fmt::print("** HEADER_IN\n");
-            break;
-        case CURLINFO_HEADER_OUT:
-            fmt::print("** HEADER_OUT\n");
-            fmt::print("{}\n\n", data);
-            break;
-        case CURLINFO_DATA_IN:
-            fmt::print("** DATA_IN\n");
-            break;
-        case CURLINFO_SSL_DATA_IN:
-            fmt::print("** SSL_DATA_IN\n");
-            break;
-        default:
-            fmt::print("** unknown: {}\n", type);
-            break;
-    }
-    for (size_t i = 0; i < size; i++) {
-        if (i % 80 == 0 && i != 0)
-            fprintf(stderr, "\n");
-        fprintf(stderr, "%c", isgraph(data[i]) ? data[i] : '.');
-    }
-    fprintf(stderr, "\n");
-    return 0;
-}
-} // namespace
+using json = nlohmann::json;
 
 Weather::Weather(const Settings &settings)
     : settings(settings), load_file(settings.netatmo_load), store_file(settings.netatmo_store) {
@@ -87,9 +38,22 @@ std::chrono::minutes Weather::check_sleep(std::chrono::minutes sleep_time) {
 }
 
 std::optional<Weather::MeasuredData> Weather::retrieve() {
-    return std::nullopt;
-    json device_data = fetch_device_data();
-    fmt::print("Got: {}\n", device_data.dump(2, ' '));
+    debug("Attempting to retrieve Netatmo metrics. is_authenticated={}", is_authenticated);
+    if (not is_authenticated) {
+        return std::nullopt;
+    }
+    std::optional<json> maybe_device_data{fetch_device_data()};
+    if (not maybe_device_data) {
+        debug("Was not able to fetch device data");
+        return std::nullopt;
+    }
+    json device_data = *maybe_device_data;
+    if (device_data.contains("error")) {
+        debug("Got error from netatmo:\n{}", device_data.dump(2, ' '));
+        return std::nullopt;
+    }
+    // debug("Got: {}\n", device_data.dump(2, ' '));
+    //  TODO: Check for error message from server
     json device_list = device_data["body"]["devices"];
     if (device_list.size() != 1) {
         log("Invalid amount of devices, should be 1, got {}", device_list.size());
@@ -140,157 +104,58 @@ std::optional<Weather::MeasuredData> Weather::retrieve() {
     }
 }
 
-/**
- * Authenticate against netatmo API
- */
-bool Weather::authenticate() {
-    debug("Authenticating against Netatmo");
-    return false;
+bool Weather::get_token(const PostParams &params) {
+    debug("Retrieving authentication token");
     if (load_file) {
-        log("Skipping authentication, as data is loaded from file");
+        log("Will not fetch authorization token, as data is loaded from file");
         is_authenticated = true;
         return true;
     }
 
-//    CURL *curl = curl_easy_init();
-//
-//    curl_mime *mime = curl_mime_init(curl);
-//    curl_mimepart *part;
-//
-//    part = curl_mime_addpart(mime);
-//    curl_mime_data(part, netatmo.client_id.c_str(), CURL_ZERO_TERMINATED);
-//    curl_mime_name(part, "client_id");
-//
-//    part = curl_mime_addpart(mime);
-//    curl_mime_data(part, netatmo.client_secret.c_str(), CURL_ZERO_TERMINATED);
-//    curl_mime_name(part, "client_secret");
-//
-//    part = curl_mime_addpart(mime);
-//    curl_mime_data(part, netatmo.username.c_str(), CURL_ZERO_TERMINATED);
-//    curl_mime_name(part, "username");
-//
-//    part = curl_mime_addpart(mime);
-//    curl_mime_data(part, netatmo.password.c_str(), CURL_ZERO_TERMINATED);
-//    curl_mime_name(part, "password");
-//
-//    part = curl_mime_addpart(mime);
-//    curl_mime_data(part, "password", CURL_ZERO_TERMINATED);
-//    curl_mime_name(part, "grant_type");
-//
-//    part = curl_mime_addpart(mime);
-//    curl_mime_data(part, "read_station", CURL_ZERO_TERMINATED);
-//    curl_mime_name(part, "scope");
-//
-//    char errbuf[CURL_ERROR_SIZE]{};
-//    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
-//    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
-//    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
-//    if (settings.debug_log) {
-//        curl_easy_setopt(curl, CURLOPT_DEBUGFUNCTION, trace_function);
-//    }
-//
-//    // TODO: create unique ptr for curl_easy_escape
-//    char *username = curl_easy_escape(curl, netatmo.username.c_str(), 0);
-//    char *password = curl_easy_escape(curl, netatmo.password.c_str(), 0);
-//    std::ostringstream oss;
-//    oss << "grant_type=password";
-//    oss << "&client_id=" << netatmo.client_id;
-//    oss << "&client_secret=" << netatmo.client_secret;
-//    oss << "&username=" << username;
-//    oss << "&password=" << password;
-//    oss << "&scope=read_station";
-//    curl_free(username);
-//    curl_free(password);
-//    std::string postdata = oss.str();
-//
-//    // curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
-//    curl_easy_setopt(curl, CURLOPT_POST, 1L);
-//    curl_easy_setopt(curl, CURLOPT_POSTFIELDS, postdata.c_str());
-//    curl_easy_setopt(curl, CURLOPT_URL, "https://api.netatmo.com/oauth2/token");
-//    // curl_easy_setopt(curl, CURLOPT_URL, "localhost:8000");
-//
-//    std::string response{};
-//    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-//    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-//
-//    debug("Performing authentication");
-//    CURLcode result = curl_easy_perform(curl);
-//    curl_easy_cleanup(curl);
-//    curl_mime_free(mime);
-//
-//    if (result != CURLE_OK) {
-//        log("Was not able to retrieve auth token. {}", response);
-//        return false;
-//    }
-//
-//    if (!json::accept(response)) {
-//        log("Response is not a valid JSON");
-//        return false;
-//    }
-//
-//    return process_authentication_result(json::parse(response));
+    Curl curl{settings};
+    Url url{std::string{settings.token_server}};
+    auto [success, response] = curl.postfields(url, params);
+    debug("Got response: {}", utils::as_string_view(response));
+    if (not success) {
+        log("Unable to POST authorization request");
+        return false;
+    }
+
+    if (!json::accept(response)) {
+        log("Authorization POST response is not a valid JSON");
+        return false;
+    }
+
+    return process_authentication_result(json::parse(response));
+}
+
+/**
+ * Authenticate against netatmo API
+ */
+bool Weather::authenticate(const Auth& auth) {
+    debug("Authenticating against Netatmo using code=\"{}\", redirect=\"{}\"", auth.code, auth.redirect);
+    return get_token(PostParams{
+        {"grant_type", "authorization_code"},
+        {"client_id", settings.netatmo.client_id},
+        {"client_secret", settings.netatmo.client_secret},
+        {"redirect_uri", auth.redirect},
+        {"code", auth.code},
+        {"scope", "read_station"},
+    });
 }
 
 /**
  * Refresh the authentication token
  */
 bool Weather::refresh_authentication() {
-    // TODO: do not authenticate
-    return true;
-    if (load_file) {
-        log("Skipping authentication refresh, as data is loaded from file");
-        is_authenticated = true;
-        return true;
-    }
-
-    CURL *curl = curl_easy_init();
-
-    curl_mime *mime = curl_mime_init(curl);
-    curl_mimepart *part;
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, netatmo.client_id.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "client_id");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, netatmo.client_secret.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "client_secret");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, refresh_token.c_str(), CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "refresh_token");
-
-    part = curl_mime_addpart(mime);
-    curl_mime_data(part, "refresh_token", CURL_ZERO_TERMINATED);
-    curl_mime_name(part, "grant_type");
-
-    char errbuf[CURL_ERROR_SIZE]{};
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
-
-    curl_easy_setopt(curl, CURLOPT_MIMEPOST, mime);
-    curl_easy_setopt(curl, CURLOPT_URL, "https://api.netatmo.com/oauth2/token");
-
-    std::string response{};
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-
-    CURLcode result = curl_easy_perform(curl);
-    curl_easy_cleanup(curl);
-    curl_mime_free(mime);
-
-    if (result != CURLE_OK) {
-        log("Was not able to retrieve auth token. {}", response);
-        return false;
-    }
-
-    if (!json::accept(response)) {
-        log("Response is not a valid JSON");
-        return false;
-    }
-
-    return process_authentication_result(json::parse(response));
+    debug("Refreshing Netatmo authentication");
+    return get_token(PostParams{
+        {"grant_type", "refresh_token"},
+        {"client_id", settings.netatmo.client_id},
+        {"client_secret", settings.netatmo.client_secret},
+        {"refresh_token", refresh_token},
+        {"scope", "read_station"},
+    });
 }
 
 bool Weather::process_authentication_result(json auth) {
@@ -302,18 +167,20 @@ bool Weather::process_authentication_result(json auth) {
         return false;
     }
 
+    is_authenticated = true;
     access_token = auth["access_token"];
     refresh_token = auth["refresh_token"];
     std::chrono::seconds expires_in{static_cast<long>(auth["expires_in"])};
 
     expiration_time = std::chrono::system_clock::now() + expires_in;
+    debug("We are now authenticated for netatmo");
     return true;
 }
 
 /**
  * Fetch device data from the `getstationsdata` API and return as JSON object
  */
-nlohmann::json Weather::fetch_device_data() {
+std::optional<nlohmann::json> Weather::fetch_device_data() {
     debug("Fetching device data");
     if (load_file) {
         return load_data(*load_file);
@@ -321,35 +188,20 @@ nlohmann::json Weather::fetch_device_data() {
 
     assert(is_authenticated);
 
-    CURL *curl = curl_easy_init();
-    curl_slist *list = nullptr;
+    Curl curl{settings};
+    Url url{std::string{settings.station_addr}};
+    url.add_param({"device_id", settings.netatmo.device_id});
+    auto [success, response] =
+        curl.get(url, HeaderParams{
+                          {"Accept", "application/json"},
+                          {"Authorization", fmt::format("Bearer {}", access_token)},
+                      });
 
-    char errbuf[CURL_ERROR_SIZE]{};
-    curl_easy_setopt(curl, CURLOPT_ERRORBUFFER, errbuf);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0l);
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1l);
-
-    char *device_id = curl_easy_escape(curl, settings.netatmo.device_id.c_str(), 0);
-    const std::string url = fmt::format(
-        "https://api.netatmo.com/api/getstationsdata?"
-        "device_id={}",
-        device_id);
-    curl_free(device_id);
-
-    list = curl_slist_append(list, "Accept: application/json");
-    std::string auth = fmt::format("Authorization: Bearer {}", access_token);
-    list = curl_slist_append(list, auth.c_str());
-
-    curl_easy_setopt(curl, CURLOPT_HTTPHEADER, list);
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-    curl_easy_setopt(curl, CURLOPT_HTTPGET, 1l);
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, write_cb);
-    std::string response{};
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &response);
-    curl_easy_perform(curl);
-
-    curl_slist_free_all(list);
-    curl_easy_cleanup(curl);
+    if (!json::accept(response)) {
+        log("Device data is not properly formatted JSON");
+        debug("Got:\n{}", utils::dump_bytes_as_string(response));
+        return std::nullopt;
+    }
 
     json device_data = json::parse(response);
     if (store_file) {
@@ -377,8 +229,8 @@ nlohmann::json Weather::load_data(const std::string &title) {
 /**
  * Store json data to provided file, and increment file counter
  */
-void Weather::store_data(const std::string &filename, const json &j) {
+void Weather::store_data(const std::string &filename, const json &data) {
     std::ofstream out{fmt::format("{}-{}.json", filename, store_index)};
     store_index += 1;
-    out << std::setw(4) << j << std::endl;
+    out << std::setw(4) << data << std::endl;
 }

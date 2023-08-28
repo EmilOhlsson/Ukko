@@ -1,16 +1,21 @@
+#include <condition_variable>
 #include <fmt/core.h>
 #include <getopt.h>
+#include <mutex>
 #include <optional>
+#include <thread>
 
 #include "common.hpp"
 #include "display.hpp"
 #include "forecast.hpp"
 #include "gpio.hpp"
 #include "hwif.hpp"
+#include "message_queue.hpp"
 #include "netatmo.hpp"
 #include "screen.hpp"
 #include "token-storage.hpp"
 #include "ukko.hpp"
+#include "web-server.hpp"
 
 int main(int argc, char **argv) {
     int c;
@@ -135,9 +140,7 @@ int main(int argc, char **argv) {
         return -1;
     }
 
-    fmt::print("load forecast {}\n", options_used.cycles);
     Settings settings{options_used};
-    fmt::print("load forecast {}\n", settings.cycles);
     Ukko ukko{std::move(settings)};
 
     return ukko.run();
@@ -147,10 +150,17 @@ int Ukko::run() {
     using namespace std::literals::chrono_literals;
     using namespace std::chrono;
 
+    MessageQueue<Auth> queue{settings};
+    WebServer wserver{settings, [&](const Auth &auth) { queue.push(auth); }};
+    wserver.start();
+
+    /* Main logic loop. This will run for a given amount of cycles, or forever. This will fetch
+     * weather measurements and forecast, and update display */
     for (uint32_t i = 0; settings.cycles == 0 || i < settings.cycles; i++) {
         bool update_screen = false;
+        const time_point<system_clock> now = system_clock::now();
 
-        time_point<system_clock> now = system_clock::now();
+        /* Check if it's time to fetch new weather metrics */
         if (weather_time + settings.weather_frequency < now) {
             debug("Fetching current weather metrics");
             if (std::optional<Weather::MeasuredData> mdp = weather_service.retrieve()) {
@@ -162,16 +172,23 @@ int Ukko::run() {
                     position = mdp->position;
                 }
             } else {
-                debug("Was not able to fetch weather metrics");
+                debug("Was not able to fetch weather metrics, clearing outdated measuerments");
+                weather_data = std::nullopt;
             }
         }
 
+        /* NOTE: We can get position either from Netatmo, or from configuration files. If we don't
+         * have a position, and we don't have information about how to authenticate we can never
+         * learn the position. */
         if (not position && weather_service.can_authenticate()) {
-            // TODO display message on display
+            /* TODO: As this state means we cannot operate, we should notify something on the
+             * display indicating the broken state */
             log("Doesn't have a proper position");
             abort();
         }
 
+        /* Fetch forecast if it's time. If we did get a new forecast make sure the display is
+         * updated with the new forecast */
         if (forecast_time + settings.forecast_frequency < now) {
             debug("Fetching forecast");
             if (std::optional<std::vector<Forecast::DataPoint>> dps =
@@ -185,13 +202,20 @@ int Ukko::run() {
             }
         }
 
+        /* We have new information to display */
         if (update_screen) {
             debug("Updating screen with new information");
             screen.draw(forecast_data, weather_data);
             display.draw(screen.get_ptr());
         }
 
-        std::this_thread::sleep_for(settings.sleep);
+        if (std::optional<Auth> auth = queue.pop(now + settings.sleep)) {
+            debug("Have code, will attempt to authenticate: {}", *auth);
+            std::ignore = weather_service.authenticate(*auth);
+        } else {
+            debug("Waited, refreshing authentication");
+            std::ignore = weather_service.refresh_authentication();
+        }
     }
 
     return 0;

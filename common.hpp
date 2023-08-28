@@ -4,6 +4,7 @@
 #include <fmt/color.h>
 #include <fmt/core.h>
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <optional>
 #include <string>
@@ -17,13 +18,20 @@ enum class RunMode {
 
 struct Logger {
     enum class Facility {
-        Ukko,
-        Forecast,
-        Screen,
+        Curl,
+        CurlList,
+        CurlMime,
         Display,
-        Hwif,
+        Forecast,
         Gpio,
+        Hwif,
+        MessageQueue,
+        Screen,
+        Ukko,
         Weather,
+        WebConnection,
+        WebConnectionDump,
+        WebServer,
     };
 
     Logger(Facility facility, bool enabled) : facility(facility), enabled(enabled) {
@@ -46,6 +54,15 @@ struct Logger {
 
     fmt::text_style get_style() const {
         switch (facility) {
+            case Facility::Curl:
+                return fmt::fg(fmt::color::coral);
+
+            case Facility::CurlMime:
+                return fmt::fg(fmt::color::pink);
+
+            case Facility::CurlList:
+                return fmt::fg(fmt::color::blanched_almond);
+
             case Facility::Ukko:
                 return fmt::fg(fmt::color::light_blue);
 
@@ -64,14 +81,35 @@ struct Logger {
             case Facility::Hwif:
                 return fmt::fg(fmt::color::light_pink);
 
+            case Facility::MessageQueue:
+                return fmt::fg(fmt::color::crimson);
+
             case Facility::Weather:
                 return fmt::fg(fmt::color::light_green);
+
+            case Facility::WebServer:
+                return fmt::fg(fmt::color::white);
+
+            case Facility::WebConnection:
+                return fmt::fg(fmt::color::green);
+
+            case Facility::WebConnectionDump:
+                return fmt::fg(fmt::color::gold);
         }
         return {};
     }
 
-    std::string get_name() const {
+    std::string_view get_name() const {
         switch (facility) {
+            case Facility::Curl:
+                return "Curl";
+
+            case Facility::CurlMime:
+                return "Curl::Mime";
+
+            case Facility::CurlList:
+                return "Curl::List";
+
             case Facility::Ukko:
                 return "Ukko";
 
@@ -79,7 +117,7 @@ struct Logger {
                 return "GPIO";
 
             case Facility::Forecast:
-                return "Weather";
+                return "Forecast";
 
             case Facility::Screen:
                 return "Screen";
@@ -90,8 +128,20 @@ struct Logger {
             case Facility::Hwif:
                 return "Hwif";
 
+            case Facility::MessageQueue:
+                return "MessageQueue";
+
             case Facility::Weather:
                 return "Weather";
+
+            case Facility::WebServer:
+                return "Web";
+
+            case Facility::WebConnection:
+                return "Web::Connection";
+
+            case Facility::WebConnectionDump:
+                return "Web::Connection::Dump";
         }
         return "Broken";
     }
@@ -100,7 +150,25 @@ struct Logger {
 struct Position {
     std::string longitude;
     std::string latitude;
+
+  private:
+    friend std::ostream &operator<<(std::ostream &ostream, const Position &self) {
+        ostream << "[longitude=" << self.longitude << ", latitude=" << self.latitude << "]";
+        return ostream;
+    }
 };
+template <> struct fmt::formatter<Position> : ostream_formatter {};
+
+struct Auth {
+    std::string code;
+    std::string redirect;
+
+    friend std::ostream &operator<<(std::ostream &ostream, const Auth &self) {
+        ostream << "[code=" << self.code << ", redirect=" << self.redirect << "]";
+        return ostream;
+    }
+};
+template <> struct fmt::formatter<Auth> : ostream_formatter {};
 
 struct Options {
     uint32_t cycles{};
@@ -118,6 +186,7 @@ struct Options {
     std::chrono::minutes forecast_frequency{120};
     std::chrono::minutes weather_frequency{30};
 
+    bool dump_traffic = true;
     bool verbose = false;
     bool debug_log = false;
     RunMode run_mode = DUMMY ? RunMode::Dry : RunMode::Normal;

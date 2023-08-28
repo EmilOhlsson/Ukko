@@ -12,9 +12,11 @@ extern "C" {
 #include <lualib.h>
 }
 
+/* TODO: Now when we have a web server running we probably want to replace configuration by Lua
+ * script with a web page and a sqlite database backing. For example the page could include some
+ * form of factory reset button, which purges the database. This kind of configuration would render
+ * the lua script obsolete */
 struct Settings : public Options {
-    // TODO: Would probably make sense to merge this with options.
-    //       could have this class extend options.
     Settings(const Options &options) : Options{options} {
         LuaFile file(settings_file);
 
@@ -50,12 +52,21 @@ struct Settings : public Options {
         } modules;
     } netatmo;
 
+#if defined(LOOPBACK) && LOOPBACK
+    static constexpr std::string_view auth_server{"http://localhost:8080/oauth2/authorize"};
+    static constexpr std::string_view token_server{"http://localhost:8080/oauth2/token"};
+    static constexpr std::string_view station_addr{"http://localhost:8080/api/getstationsdata"};
+#else
+    static constexpr std::string_view auth_server {"https://api.netatmo.com/oauth2/authorize"};
+    static constexpr std::string_view token_server {"https://api.netatmo.com/oauth2/token"};
+    static constexpr std::string_view station_addr {"https://api.netatmo.com/api/getstationsdata"};
+#endif
+
     std::optional<Position> position{};
 
   private:
-    // TODO: Generalize this approach not always look at top of stack,
-    //       instead keep track of height of stack, and the position of
-    //       self.
+    /* TODO: Generalize this approach not always look at top of stack, instead keep track of height
+     * of stack, and the position of self. */
     /* Helper object for automatic stack popping */
     struct LuaObj {
         LuaObj(lua_State *L) : L(L) {
@@ -82,8 +93,7 @@ struct Settings : public Options {
         LuaString get_string_field(const char *name) const {
             int status = lua_getfield(L, -1, name);
             if (status != LUA_TSTRING) {
-                throw std::runtime_error(
-                    fmt::format("Expected field {} to be a string, but it's not", name));
+                throw utils::runtime_error("Expected field {} to be a string, but it's not", name);
             }
             return LuaString{L};
         }
@@ -91,8 +101,7 @@ struct Settings : public Options {
         LuaTable get_table_field(const char *name) {
             int status = lua_getfield(L, -1, name);
             if (status != LUA_TTABLE) {
-                throw std::runtime_error(
-                    fmt::format("Expected {} to be a table, but it's not", name));
+                throw utils::runtime_error("Expected {} to be a table, but it's not", name);
             }
             return LuaTable{L};
         }
@@ -106,8 +115,8 @@ struct Settings : public Options {
 
             int status = luaL_dofile(L, filename.c_str());
             if (status) {
-                throw std::runtime_error(
-                    fmt::format("Unable to open and read settings file: {}", lua_tostring(L, -1)));
+                throw utils::runtime_error("Unable to open and read settings file: {}",
+                                           lua_tostring(L, -1));
             }
         }
 
@@ -118,8 +127,7 @@ struct Settings : public Options {
         LuaTable get_table(const char *table) {
             int status = lua_getglobal(L, table);
             if (status != LUA_TTABLE) {
-                throw std::runtime_error(
-                    fmt::format("Expected {} to be a table, but it's not", table));
+                throw utils::runtime_error("Expected {} to be a table, but it's not", table);
             }
             return LuaTable{L};
         }
