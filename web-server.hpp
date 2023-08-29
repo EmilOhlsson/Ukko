@@ -347,7 +347,7 @@ struct WebServer final {
                     debug("Got authentication code: {}", *code);
                     on_auth_code({
                         .code = *code,
-                        .redirect = std::format("http://{}", *hostname),
+                        .redirect = fmt::format("http://{}", *hostname),
                     });
                 }
                 /* Note: We are just randomizing state, but we do not track it */
