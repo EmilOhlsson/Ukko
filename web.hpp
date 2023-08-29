@@ -248,8 +248,12 @@ struct Curl {
         }
 
         ~CurlStderr() {
-            fclose(stream);
-            free(memory);
+            if (stream != nullptr) {
+                fclose(stream);
+            }
+            if (memory != nullptr) {
+                free(memory);
+            }
         }
         // NOLINTEND
 
@@ -298,16 +302,16 @@ struct Curl {
         Logger debug;
     };
 
-    auto url_encode(const std::string& str) const -> std::string {
+    auto url_encode(const std::string &str) const -> std::string {
         // NOLINTBEGIN: Nasty C stuff
-        char* url_encoded {curl_easy_escape(curl, str.c_str(), str.size())};
-        std::string result {url_encoded};
+        char *url_encoded{curl_easy_escape(curl, str.c_str(), str.size())};
+        std::string result{url_encoded};
         curl_free(url_encoded);
         return result;
         // NOLINTEND
     }
 
-    auto url_encode(const std::map<std::string, std::string>& params) const -> std::string {
+    auto url_encode(const std::map<std::string, std::string> &params) const -> std::string {
         std::stringstream stringstream{};
         for (auto iter = params.begin(); iter != params.end(); ++iter) {
             if (iter != params.begin()) {
@@ -339,7 +343,6 @@ struct Curl {
         curl_easy_setopt(curl, CURLOPT_WRITEDATA, this);
         curl_easy_setopt(curl, CURLOPT_CURLU, static_cast<const CURLU *>(url));
     }
-
 
     // NOLINTBEGIN: C API
     /**

@@ -44,7 +44,7 @@ struct Weather {
     /**
      * Authenticate against netatmo API
      */
-    [[nodiscard]] bool authenticate(const Auth& auth);
+    [[nodiscard]] bool authenticate(const Auth &auth);
 
     /**
      * Refresh the authentication token
@@ -101,5 +101,4 @@ struct Weather {
     std::string access_token{};
     std::string refresh_token{};
     std::chrono::time_point<std::chrono::system_clock> expiration_time{};
-
 };

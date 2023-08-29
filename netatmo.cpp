@@ -132,8 +132,9 @@ bool Weather::get_token(const PostParams &params) {
 /**
  * Authenticate against netatmo API
  */
-bool Weather::authenticate(const Auth& auth) {
-    debug("Authenticating against Netatmo using code=\"{}\", redirect=\"{}\"", auth.code, auth.redirect);
+bool Weather::authenticate(const Auth &auth) {
+    debug("Authenticating against Netatmo using code=\"{}\", redirect=\"{}\"", auth.code,
+          auth.redirect);
     return get_token(PostParams{
         {"grant_type", "authorization_code"},
         {"client_id", settings.netatmo.client_id},

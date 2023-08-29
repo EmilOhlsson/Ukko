@@ -57,9 +57,9 @@ struct Settings : public Options {
     static constexpr std::string_view token_server{"http://localhost:8080/oauth2/token"};
     static constexpr std::string_view station_addr{"http://localhost:8080/api/getstationsdata"};
 #else
-    static constexpr std::string_view auth_server {"https://api.netatmo.com/oauth2/authorize"};
-    static constexpr std::string_view token_server {"https://api.netatmo.com/oauth2/token"};
-    static constexpr std::string_view station_addr {"https://api.netatmo.com/api/getstationsdata"};
+    static constexpr std::string_view auth_server{"https://api.netatmo.com/oauth2/authorize"};
+    static constexpr std::string_view token_server{"https://api.netatmo.com/oauth2/token"};
+    static constexpr std::string_view station_addr{"https://api.netatmo.com/api/getstationsdata"};
 #endif
 
     std::optional<Position> position{};
