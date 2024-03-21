@@ -92,8 +92,8 @@ struct Output {
     }
 
   private:
-    gpiod_chip *chip{};
-    gpiod_line *line{};
+    gpiod::chip *chip{};
+    gpiod::line_config *line{};
 
     Active level;
     const Options &options;

@@ -11,6 +11,10 @@
 
 #include "utils.hpp"
 
+#ifndef DUMMY
+#define DUMMY true
+#endif
+
 enum class RunMode {
     Normal,
     Dry,
