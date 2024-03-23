@@ -7,7 +7,6 @@
 #include <fmt/os.h>
 
 #include "hwif.hpp"
-#include "utils.hpp"
 
 struct Display {
     Display(const Options &options, hwif::Hwif &hwif) : hwif(hwif), options(options) {

@@ -1,19 +1,13 @@
-#include <condition_variable>
 #include <fmt/core.h>
 #include <getopt.h>
-#include <mutex>
 #include <optional>
-#include <thread>
 
 #include "common.hpp"
 #include "display.hpp"
 #include "forecast.hpp"
-#include "gpio.hpp"
-#include "hwif.hpp"
 #include "message_queue.hpp"
 #include "netatmo.hpp"
 #include "screen.hpp"
-#include "token-storage.hpp"
 #include "ukko.hpp"
 #include "web-server.hpp"
 

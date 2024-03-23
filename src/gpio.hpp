@@ -1,16 +1,9 @@
 #pragma once
 
-#include <algorithm>
-#include <cassert>
-#include <filesystem>
-#include <fstream>
-#include <memory>
-
 #include <gpiod.hpp>
 #include <thread>
 
 #include "common.hpp"
-#include "file.hpp"
 
 namespace gpio {
 
@@ -33,33 +26,28 @@ struct Output {
             return;
         }
 
-        chip = gpiod_chip_open("/dev/gpiochip0");
+        chip = gpiod::chip{"/dev/gpiochip0"};
         if (!chip) {
             throw std::runtime_error("Unable to open gpio chip for output");
         }
 
-        line = gpiod_chip_get_line(chip, pin);
-        if (!line) {
-            throw std::runtime_error("Unable to get line");
-        }
+        // This would probably be the prepare request
+        gpiod::request_builder request = chip->prepare_request();
+        gpiod::line_settings settings{};
+        settings.set_direction(gpiod::line::direction::OUTPUT)
+            .set_output_value(gpiod::line::value::INACTIVE)
+            .set_drive(gpiod::line::drive::OPEN_DRAIN);
 
-        gpiod_line_request_config cfg{
-            .consumer = name.c_str(),
-            .request_type = GPIOD_LINE_REQUEST_DIRECTION_OUTPUT,
-            .flags = 0,
-        };
-
-        if (gpiod_line_request(line, &cfg, 0) != 0) {
-            throw std::runtime_error("Unable to request output");
-        }
+        line = request.add_line_settings(pin, settings).do_request();
+        this->pin = pin;
     }
 
     ~Output() {
         if (line) {
-            gpiod_line_release(line);
+            line->release();
         }
         if (chip) {
-            gpiod_chip_close(chip);
+            chip->close();
         }
     }
 
@@ -72,9 +60,7 @@ struct Output {
             return;
         }
 
-        if (gpiod_line_set_value(line, value) != 0) {
-            throw std::runtime_error("Unable to activate pin");
-        }
+        line->set_value(*pin, gpiod::line::value::ACTIVE);
     }
 
     /**
@@ -86,14 +72,13 @@ struct Output {
             return;
         }
 
-        if (gpiod_line_set_value(line, value) != 0) {
-            throw std::runtime_error("Unable to deactivate pin");
-        }
+        line->set_value(*pin, gpiod::line::value::INACTIVE);
     }
 
   private:
-    gpiod::chip *chip{};
-    gpiod::line_config *line{};
+    std::optional<gpiod::line::offset> pin;
+    std::optional<gpiod::chip> chip;
+    std::optional<gpiod::line_request> line{};
 
     Active level;
     const Options &options;
@@ -110,33 +95,28 @@ struct Input {
             return;
         }
 
-        chip = gpiod_chip_open("/dev/gpiochip0");
+        chip = gpiod::chip{"/dev/gpiochip0"};
         if (!chip) {
-            throw std::runtime_error("Error opening chip for input");
+            throw std::runtime_error("Unable to open gpio chip for output");
         }
 
-        line = gpiod_chip_get_line(chip, pin);
-        if (!line) {
-            throw std::runtime_error("Error opening line");
-        }
+        // This would probably be the prepare request
+        gpiod::request_builder request = chip->prepare_request();
+        gpiod::line_settings settings{};
+        settings.set_direction(gpiod::line::direction::INPUT)
+            .set_output_value(gpiod::line::value::INACTIVE)
+            .set_drive(gpiod::line::drive::OPEN_DRAIN);
 
-        gpiod_line_request_config cfg{
-            .consumer = name.c_str(),
-            .request_type = gpiod::line_request::DIRECTION_INPUT,
-            .flags = 0,
-        };
-
-        if (gpiod_line_request(line, &cfg, 0) != 0) {
-            throw std::runtime_error("Unable to request line");
-        }
+        line = request.add_line_settings(pin, settings).do_request();
+        this->pin = pin;
     }
 
     ~Input() {
         if (line) {
-            gpiod_line_release(line);
+            line->release();
         }
         if (chip) {
-            gpiod_chip_close(chip);
+            chip->close();
         }
     }
 
@@ -152,14 +132,15 @@ struct Input {
         do {
             std::this_thread::sleep_for(5ms);
             sleep_count += 1;
-        } while (!gpiod_line_get_value(line));
+        } while (line->get_value(*pin) != gpiod::line::value::ACTIVE);
         log("Slept for {} iterations", sleep_count);
         std::this_thread::sleep_for(5ms);
     }
 
   private:
-    gpiod_chip *chip{};
-    gpiod_line *line{};
+    std::optional<gpiod::line::offset> pin;
+    std::optional<gpiod::chip> chip;
+    std::optional<gpiod::line_request> line{};
     const Options &options;
     const Logger log = options.get_logger(Logger::Facility::Gpio);
 };

@@ -14,6 +14,7 @@
 
 #include "common.hpp"
 #include "gpio.hpp"
+#include "file.hpp"
 
 namespace hwif {
 
@@ -88,7 +89,7 @@ struct Hwif {
 
         set_mode(SPI_MODE_0);
         set_chip_select(ChipSelect::Low);
-        set_speed(10000000);
+        set_speed(10'000'000);
     }
 
     template <typename T> void send(Command cmd, T data) {

@@ -15,6 +15,8 @@
 #define DUMMY true
 #endif
 
+static_assert(DUMMY, "GPIO code is in an unknown state");
+
 enum class RunMode {
     Normal,
     Dry,
