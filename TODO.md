@@ -1,25 +1,14 @@
 # TODO list
-[ ] Finish GPIO implementation
-[ ] Finish SPI implementation
-[ ] Translate eval code to proper code
-[ ] Look a bit more at the Display configuration
- - How does the dev sample match the data sheet?
- - Investigate splitting up screen
-   - Perhaps not possible
-[ ] Make display show image
-[ ] Make display show text
-[ ] EFL Evas library should be a good fit to create a drawing canvas
- - Add debug functionality to store rendered image to file
-[ ] Fetch data from netatmo
-[ ] Fetch weather forecast
- - [ ] curl should be a good fit
- - [ ] SMHI open data: https://opendata.smhi.se/apidocs/metobs/common.html
- - [ ] Fetch hourly
+[ ] Convert settings file to some form of KV-store like solution, which on linux would be Sqlite
+[ ] Create RPM that can be installed
+[ ] Have cmake generate settings for program
 
-# Summary of used libraries
-libjson / jansson
-libcurl
-libefl
+# Thoughts on settings
+There are three classes of settings: 
+* Program parameters - flags given while starting program
+* persistent configurations - settings likely to never change
+* volatile keys - tokens that change frequently, and doesn't really make sense to store 
+  - Can each module be in charge of it's own keys? This is mostly related to OAuth2
 
 # Misc notes
 ## Explanations of EPD functions
@@ -47,3 +36,5 @@ Sometimes wait on busy signal
 
 ## Overview
 All steps involve sending different commands, followed by data. 
+
+<!-- vim set: et sw=2 ss=2 tw=80 : -->

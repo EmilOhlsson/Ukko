@@ -15,13 +15,16 @@ enum class Active : int {
     High = 1,
 };
 
+/* TODO: I suspect we might want to merge this with hwif, considering how gpiod has
+ * been updated */
 struct Output {
     /**
      * Create new GPIO output using `pin`. It will be considered active at given `level`.
      * If options describe this as dry run, then no actual GPIO toggling will be made
      */
-    Output(const Options &options, Active level, uint32_t pin, const std::string &name)
-        : level(level), options(options) {
+    Output(const Options &options, Active level, uint32_t pin,
+           const std::string &name [[maybe_unused]])
+        : options(options) {
         if (options.is_dry()) {
             return;
         }
@@ -35,7 +38,7 @@ struct Output {
         gpiod::request_builder request = chip->prepare_request();
         gpiod::line_settings settings{};
         settings.set_direction(gpiod::line::direction::OUTPUT)
-            .set_output_value(gpiod::line::value::INACTIVE)
+            .set_output_value(level == Active::Low ? gpiod::line::value::INACTIVE: gpiod::line::value::ACTIVE)
             .set_drive(gpiod::line::drive::OPEN_DRAIN);
 
         line = request.add_line_settings(pin, settings).do_request();
@@ -55,7 +58,6 @@ struct Output {
      * Set pin to active state, as per `active` level given at construction
      */
     void activate() {
-        int value = static_cast<int>(level);
         if (options.is_dry()) {
             return;
         }
@@ -67,7 +69,6 @@ struct Output {
      * Set pin to deactive state, as per `active` level given at construction
      */
     void deactive() {
-        int value = !static_cast<int>(level);
         if (options.is_dry()) {
             return;
         }
@@ -80,7 +81,6 @@ struct Output {
     std::optional<gpiod::chip> chip;
     std::optional<gpiod::line_request> line{};
 
-    Active level;
     const Options &options;
     Logger log = options.get_logger(Logger::Facility::Gpio);
 };
@@ -90,7 +90,8 @@ struct Input {
      * Create new GPIO input using `pin`. If options describe this as dry run,
      * then no actual GPIO toggling will be made
      */
-    Input(const Options &options, uint32_t pin, const std::string &name) : options(options) {
+    Input(const Options &options, uint32_t pin, const std::string &name [[maybe_unused]])
+        : options(options) {
         if (options.is_dry()) {
             return;
         }

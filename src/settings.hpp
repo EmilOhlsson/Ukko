@@ -2,7 +2,6 @@
 
 #include <fmt/core.h>
 #include <optional>
-#include <vector>
 
 #include "common.hpp"
 
@@ -12,12 +11,17 @@ extern "C" {
 #include <lualib.h>
 }
 
+#ifndef LOOPBACK
+#define LOOPBACK true
+#endif
+
 /* TODO: Now when we have a web server running we probably want to replace configuration by Lua
  * script with a web page and a sqlite database backing. For example the page could include some
  * form of factory reset button, which purges the database. This kind of configuration would render
  * the lua script obsolete */
 struct Settings : public Options {
     Settings(const Options &options) : Options{options} {
+        // TODO: Need to create some form of empty configuration state
         LuaFile file(settings_file);
 
         LuaTable netatmo_config = file.get_table("netatmo");

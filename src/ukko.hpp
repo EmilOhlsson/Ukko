@@ -26,6 +26,7 @@ struct Ukko {
 	,position {settings.position} {
     }
 
+    /** Main program loop */
     int run();
 
   private:

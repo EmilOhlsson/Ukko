@@ -169,6 +169,7 @@ struct Auth {
     std::string code;
     std::string redirect;
 
+  private:
     friend std::ostream &operator<<(std::ostream &ostream, const Auth &self) {
         ostream << "[code=" << self.code << ", redirect=" << self.redirect << "]";
         return ostream;
@@ -176,21 +177,28 @@ struct Auth {
 };
 template <> struct fmt::formatter<Auth> : ostream_formatter {};
 
+/**
+ * Container for handling program parameters
+ *
+ * These are the parameters set when starting the program
+ */
 struct Options {
-    uint32_t cycles{};
-    std::optional<std::string> forecast_load{};
-    std::optional<std::string> forecast_store{};
-    std::optional<std::string> screen_store{};
-    std::optional<std::string> render_store{};
-    std::optional<std::string> netatmo_store{};
-    std::optional<std::string> netatmo_load{};
+    uint32_t cycles{};                           /**< number of cycles to run program */
+    std::optional<std::string> forecast_load{};  /**< Load forecast from file */
+    std::optional<std::string> forecast_store{}; /**< Store forecast to file */
+    std::optional<std::string> screen_store{};   /**< Store screen to file */
+    std::optional<std::string> render_store{};   /**< Store rendering to file */
+    std::optional<std::string> netatmo_store{};  /**< Store measurements to file */
+    std::optional<std::string> netatmo_load{};   /**< Load measurements to file */
 
+    // TODO: This should probably be a path instead
     std::string settings_file = "/etc/ukko.lua";
 
-    std::chrono::minutes sleep{60};
-    std::chrono::minutes retry_sleep{5};
-    std::chrono::minutes forecast_frequency{120};
-    std::chrono::minutes weather_frequency{30};
+    // TODO: Is `sleep` needed? can't this be deduced from frequencies?
+    std::chrono::minutes sleep{60};               /**< How often to refresh values */
+    std::chrono::minutes retry_sleep{5};          /**< How fast to retry on failure */
+    std::chrono::minutes forecast_frequency{120}; /**< How often to refresh forecast */
+    std::chrono::minutes weather_frequency{30};   /**< How often to refresh measurements */
 
     bool dump_traffic = true;
     bool verbose = false;

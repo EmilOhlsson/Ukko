@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cassert>
 #include <fmt/ostream.h>
 #include <fmt/std.h>
 #include <functional>
@@ -17,6 +16,7 @@ extern "C" {
 #include <sys/socket.h>
 }
 
+/** stream formatting for Results */
 std::ostream &operator<<(std::ostream &ostream, MHD_Result result) {
     switch (result) {
         case MHD_Result::MHD_YES:
@@ -28,6 +28,7 @@ std::ostream &operator<<(std::ostream &ostream, MHD_Result result) {
 }
 template <> struct fmt::formatter<MHD_Result> : ostream_formatter {};
 
+/** Stream formatting for termination codes */
 std::ostream &operator<<(std::ostream &ostream, MHD_RequestTerminationCode code) {
     switch (code) {
         case MHD_RequestTerminationCode::MHD_REQUEST_TERMINATED_CLIENT_ABORT:
@@ -47,6 +48,7 @@ std::ostream &operator<<(std::ostream &ostream, MHD_RequestTerminationCode code)
 }
 template <> struct fmt::formatter<MHD_RequestTerminationCode> : ostream_formatter {};
 
+/** Stream formatting for value kinds */
 std::ostream &operator<<(std::ostream &ostream, MHD_ValueKind value_kind) {
     bool first{true};
     for (const auto vkind : {MHD_ValueKind::MHD_COOKIE_KIND, MHD_ValueKind::MHD_FOOTER_KIND,
@@ -83,10 +85,22 @@ std::ostream &operator<<(std::ostream &ostream, MHD_ValueKind value_kind) {
 }
 template <> struct fmt::formatter<MHD_ValueKind> : ostream_formatter {};
 
+/**
+ * Web server running to web UI
+ *
+ * Start web server by running the `start` function, which then spawns the actual server.
+ * Callback are set up to handle incoming connections, which are then forwarded to C++ context
+ *
+ * GET requests can retrieve the index page, which in turn allows user to call to external sites to
+ * do OAuth2 authentications. External sites then POST data to this server to provide authentication
+ * codes
+ *
+ * Internally this server has helper classes for handling specific connections
+ */
 struct WebServer final {
     WebServer() = delete;
-    WebServer(const WebServer &) = default;
-    WebServer(WebServer &&) = default;
+    WebServer(const WebServer &) = delete;
+    WebServer(WebServer &&) = delete;
     WebServer(const Settings &settings, std::function<void(const Auth &)> on_auth_code_cb)
         : log{settings.get_logger(Logger::Facility::WebServer)}
         , debug{settings.get_logger(Logger::Facility::WebServer)}
@@ -94,8 +108,8 @@ struct WebServer final {
         , on_auth_code{on_auth_code_cb} {
     }
 
-    WebServer &operator=(const WebServer &) = default;
-    WebServer &operator=(WebServer &&) = default;
+    WebServer &operator=(const WebServer &) = delete;
+    WebServer &operator=(WebServer &&) = delete;
 
     ~WebServer() {
         if (daemon != nullptr) {
@@ -103,11 +117,21 @@ struct WebServer final {
         }
     }
 
+    /** Start running web server */
     auto start() -> void {
         debug("Starting web server from thread: {}", std::this_thread::get_id());
-        daemon = MHD_start_daemon(MHD_USE_AUTO_INTERNAL_THREAD, port, accept_policy_handler, this,
-                                  answer_to_connection, this, MHD_OPTION_NOTIFY_COMPLETED,
-                                  request_completed, this, MHD_OPTION_END);
+        daemon =
+            MHD_start_daemon(MHD_USE_AUTO_INTERNAL_THREAD, // Automatic thread handling
+                             port,                         // Listening port
+                             accept_policy_handler, this,  // Which connections to accept, userdata
+
+                             answer_to_connection, this, // Callback for accepted connections
+
+                             // Register handler for completed connections
+                             MHD_OPTION_NOTIFY_COMPLETED, request_completed, this,
+
+                             // No more options
+                             MHD_OPTION_END);
     }
 
   private:
@@ -271,7 +295,7 @@ struct WebServer final {
                            << ", postprocessor="
                            << (connection.postprocessor != nullptr ? "yes" : "no") << "]";
         }
-    };
+    }; /* struct Connection */
 
     static auto accept_policy_handler(void *cls, const sockaddr *addr, socklen_t addrlen)
         -> MHD_Result {
@@ -324,6 +348,7 @@ struct WebServer final {
             std::string_view data{upload_data_cstr, *upload_data_size};
         }
         if (*con_cls == nullptr) {
+            // TODO: should use smart pointers instead, maybe
             *con_cls = new Connection{*method, self, connection};
         }
 
@@ -332,6 +357,7 @@ struct WebServer final {
     }
     /* NOLINTEND */
 
+    // TODO: Split this function
     auto handle_connection(Connection &connection, std::string_view url, Method method,
                            const char *upload_data, size_t *upload_size) -> MHD_Result {
         debug("Handling incoming {} {}. size={}", method, url, *upload_size);
@@ -357,7 +383,9 @@ struct WebServer final {
                                 fmt::arg("state", fmt::format("{:x}", rand(generator))),
                                 fmt::arg("redirect_addr", *hostname))};
                 return connection.send(page);
-            } else if (url == "/oauth2/authorize") {
+            }
+            // TODO: This is only applicable when using loopback
+            else if (url == "/oauth2/authorize") {
                 auto redirect_dest{
                     connection.lookup_value(MHD_ValueKind::MHD_GET_ARGUMENT_KIND, "redirect_uri")};
                 auto state{connection.lookup_value(MHD_ValueKind::MHD_GET_ARGUMENT_KIND, "state")};
@@ -375,6 +403,7 @@ struct WebServer final {
                 return connection.send(page, code);
             }
         }
+        // TODO: Document what this code actually does
         if (method == Method::POST) {
             if (*upload_size != 0) {
                 debug("Attempting post processing using {}", connection);
@@ -420,11 +449,17 @@ struct WebServer final {
         <h1>Authenticate with Netatmo</h1>
         <script src="script.js"></script>
         <form action="{auth_server}" method="GET">
-                <input type="hidden" name="client_id" value="{client_id}" />
-                <input type="hidden" name="redirect_uri" value="http://{redirect_addr}"/>
-                <input type="hidden" name="scope" value="read_station"/>
-                <input type="hidden" name="state" value="{state}"/>
-                <button>Get code</button>
+            <input type="hidden" name="client_id" value="{client_id}" />
+            <input type="hidden" name="redirect_uri" value="http://{redirect_addr}"/>
+            <input type="hidden" name="scope" value="read_station"/>
+            <input type="hidden" name="state" value="{state}"/>
+            <button>Netatmo authentication</button>
+        </form>
+        <form action="{ui_addr}" method="POST">
+            <input type="text" name="room_sensor" value="aa:bb:cc:dd:ee:ff"/>
+            <input type="text" name="longitude" value="13.5"/>
+            <input type="text" name="latitude value="55.0"/>
+            <buttion>Save configuration</button>
         </form>
     </body>
 </html>)html";
