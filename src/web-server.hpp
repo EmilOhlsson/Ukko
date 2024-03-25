@@ -120,6 +120,7 @@ struct WebServer final {
     /** Start running web server */
     auto start() -> void {
         debug("Starting web server from thread: {}", std::this_thread::get_id());
+        // TODO: Listen to HTTPS
         daemon =
             MHD_start_daemon(MHD_USE_AUTO_INTERNAL_THREAD, // Automatic thread handling
                              port,                         // Listening port
@@ -207,6 +208,7 @@ struct WebServer final {
 
         auto send(std::string_view data, uint32_t code = MHD_HTTP_OK,
                   const std::map<std::string, std::string> &headers = {}) const -> MHD_Result {
+            // TODO: encode Content type to indicate script for javascript
             return send(std::span<const char>{data.begin(), data.end()}, code, headers);
         }
 
@@ -363,6 +365,7 @@ struct WebServer final {
         debug("Handling incoming {} {}. size={}", method, url, *upload_size);
         connection.resolve_values();
         if (method == Method::GET) {
+            /* Index page */
             if (url == "/") {
                 auto hostname = connection.lookup_value(MHD_ValueKind::MHD_HEADER_KIND, "Host");
                 if (not hostname) {
@@ -378,15 +381,21 @@ struct WebServer final {
                 }
                 /* Note: We are just randomizing state, but we do not track it */
                 // TODO: Re-enable once this works
+                debug("Building page");
                 std::string page{
-                    fmt::format(index, fmt::arg("client_id", "client_id" /* TODO: settings.netatmo.client_id */),
-                                fmt::arg("auth_server", settings.auth_server),
+                    fmt::format(index,
+                                fmt::arg("netatmo_client_id",
+                                         "client_id" /* TODO: settings.netatmo.client_id */),
+                                fmt::arg("gcal_client_id", "gcal_client_id"),
+                                fmt::arg("netatmo_auth_server", settings.netatmo_auth_server),
+                                fmt::arg("gcal_auth_server", settings.gcal_auth_server),
                                 fmt::arg("state", fmt::format("{:x}", rand(generator))),
-                                fmt::arg("redirect_addr", *hostname))};
+                                fmt::arg("redirect_addr", *hostname),
+                                fmt::arg("ui_addr", *hostname), fmt::arg("checked", "checked"))};
                 return connection.send(page);
             }
             // TODO: This is only applicable when using loopback
-            else if (url == "/oauth2/authorize") {
+            else if (settings.loopback && url == "/oauth2/authorize") {
                 auto redirect_dest{
                     connection.lookup_value(MHD_ValueKind::MHD_GET_ARGUMENT_KIND, "redirect_uri")};
                 auto state{connection.lookup_value(MHD_ValueKind::MHD_GET_ARGUMENT_KIND, "state")};
@@ -397,7 +406,7 @@ struct WebServer final {
                     redirect, fmt::arg("redirect", *redirect_dest),
                     fmt::arg("params", fmt::format("code={}&state={}", "qwerty", *state)))};
                 return connection.send(page, MHD_HTTP_MOVED_PERMANENTLY);
-            } else if (url == "/api/getstationsdata") {
+            } else if (settings.loopback && url == "/api/getstationsdata") {
                 return connection.send(sample_device_data, MHD_HTTP_OK);
             } else {
                 auto [code, page] = lookup_page(url);
@@ -448,20 +457,66 @@ struct WebServer final {
     </head>
     <body>
         <h1>Authenticate with Netatmo</h1>
-        <script src="script.js"></script>
-        <form action="{auth_server}" method="GET">
-            <input type="hidden" name="client_id" value="{client_id}" />
+        <form action="http://{ui_addr}" method="POST">
+            <table>
+                <thead>
+                    <tr>
+                        <td>Key</td>
+                        <td>Value</td>
+                    </tr>
+                </thead>
+                <tr>
+                    <td>Longitude</td>
+                    <td>
+                        <input type="text" id="longitude" pattern="[1-9][0-9]+\.[0-9]+" value="13.5"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Latitude</td>
+                    <td>
+                        <input type="text" id="latitude"  pattern="[1-9][0-9]+\.[0-9]+" value="55.0"/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Use position from Netatmo</td>
+                    <td>
+                        <input type="checkbox" id="use_netatmo_position" {checked}/>
+                    </td>
+                </tr>
+                <tr>
+                    <td>Netatmo client ID</td>
+                    <td>
+                        <input type="text" name="netatmo_client_id" value="{netatmo_client_id}" />
+                    </td>
+                </tr>
+                <tr>
+                    <td>Google calendar client ID</td>
+                    <td>
+                        <input type="text" name="gcal_client_id" value="{gcal_client_id}" />
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" align="center">
+                        <button>Save configuration</button>
+                    </td>
+                </tr>
+            </table>
+        </form>
+        <form action="{netatmo_auth_server}" method="GET">
+            <input type="hidden" name="client_id" value="{netatmo_client_id}" />
             <input type="hidden" name="redirect_uri" value="http://{redirect_addr}"/>
             <input type="hidden" name="scope" value="read_station"/>
             <input type="hidden" name="state" value="{state}"/>
             <button>Netatmo authentication</button>
         </form>
-        <form action="{ui_addr}" method="POST">
-            <input type="text" name="room_sensor" value="aa:bb:cc:dd:ee:ff"/>
-            <input type="text" name="longitude" value="13.5"/>
-            <input type="text" name="latitude value="55.0"/>
-            <buttion>Save configuration</button>
+        <form action="{gcal_auth_server}" method="GET">
+            <input type="hidden" name="client_id" value="{gcal_client_id}" />
+            <input type="hidden" name="redirect_uri" value="http://{redirect_addr}"/>
+            <input type="hidden" name="scope" value="read_station"/>
+            <input type="hidden" name="state" value="{state}"/>
+            <button>Google calendar authentication</button>
         </form>
+        <script src="script.js"></script>
     </body>
 </html>)html";
 
@@ -501,7 +556,25 @@ struct WebServer final {
     background-color: lightblue;
 })css";
 
-    static constexpr std::string_view javascript = R"js(console.log('Hello, world')
+    static constexpr std::string_view javascript =
+        R"js(
+const latitude = document.querySelector('#latitude');
+const longitude = document.querySelector('#longitude');
+const use_netatmo_position = document.querySelector('#use_netatmo_position');
+
+use_netatmo_position.addEventListener('change', onChange);
+
+function onChange() {
+    if (use_netatmo_position.checked) {
+        longitude.setAttribute('disabled', 'true');
+        latitude.setAttribute('disabled', 'true');
+    } else {
+        longitude.removeAttribute('disabled');
+        latitude.removeAttribute('disabled');
+    }
+}
+
+onChange();
 )js";
 
     static constexpr std::string_view sample_device_data = R"json({

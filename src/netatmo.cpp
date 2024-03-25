@@ -112,7 +112,7 @@ bool Weather::get_token(const PostParams &params) {
     }
 
     Curl curl{settings};
-    Url url{std::string{settings.token_server}};
+    Url url{std::string{settings.netamo_token_server}};
     auto [success, response] = curl.postfields(url, params);
     debug("Got response: {}", utils::as_string_view(response));
     if (not success) {
@@ -193,7 +193,7 @@ std::optional<nlohmann::json> Weather::fetch_device_data() {
     assert(is_authenticated);
 
     Curl curl{settings};
-    Url url{std::string{settings.station_addr}};
+    Url url{std::string{settings.netatmo_station_addr}};
     url.add_param({"device_id", std::string{"device_id"} /* TODO: settings.netatmo.device_id */});
     auto [success, response] =
         curl.get(url, HeaderParams{

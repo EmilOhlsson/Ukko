@@ -184,8 +184,9 @@ int Ukko::run() {
 
         /* Fetch forecast if it's time. If we did get a new forecast make sure the display is
          * updated with the new forecast */
-        if (forecast_time + settings.forecast_frequency < now) {
+        if (position.has_value() && forecast_time + settings.forecast_frequency < now) {
             debug("Fetching forecast");
+            assert(position);
             if (std::optional<std::vector<Forecast::DataPoint>> dps =
                     forecast_service.retrieve(*position)) {
                 update_screen = true;

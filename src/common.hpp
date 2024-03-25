@@ -40,8 +40,13 @@ struct Logger {
         WebServer,
     };
 
+    Logger() = delete;
+    Logger(Logger&&) = delete;
     Logger(Facility facility, bool enabled) : facility(facility), enabled(enabled) {
     }
+
+    Logger& operator=(const Logger&) = delete;
+    Logger& operator=(Logger&&) = delete;
 
     template <typename S, typename... Args> void operator()(const S &format, Args &&...args) const {
         if (enabled) {
@@ -57,6 +62,10 @@ struct Logger {
   private:
     Facility facility;
     bool enabled{};
+    const bool dark_mode = []() {
+        using namespace std::literals;
+        return getenv("BACKGROUND") != "light"sv;
+    }();
 
     fmt::text_style get_style() const {
         // TODO should perhaps check background color using `getenv("BACKGROUND")`
@@ -71,37 +80,37 @@ struct Logger {
                 return fmt::fg(fmt::color::blanched_almond);
 
             case Facility::Ukko:
-                return fmt::fg(fmt::color::light_blue);
+                return fmt::fg(dark_mode ? fmt::color::light_blue : fmt::color::dark_blue);
 
             case Facility::Gpio:
                 return fmt::fg(fmt::color::red);
 
             case Facility::Forecast:
-                return fmt::fg(fmt::color::light_cyan);
+                return fmt::fg(dark_mode ? fmt::color::light_cyan : fmt::color::dark_cyan);
 
             case Facility::Screen:
-                return fmt::fg(fmt::color::light_blue);
+                return fmt::fg(dark_mode ? fmt::color::light_blue : fmt::color::dark_blue);
 
             case Facility::Display:
                 return fmt::fg(fmt::color::purple);
 
             case Facility::Hwif:
-                return fmt::fg(fmt::color::light_pink);
+                return fmt::fg(dark_mode ? fmt::color::light_pink : fmt::color::pink);
 
             case Facility::MessageQueue:
                 return fmt::fg(fmt::color::crimson);
 
             case Facility::Weather:
-                return fmt::fg(fmt::color::light_green);
+                return fmt::fg(dark_mode ? fmt::color::light_green : fmt::color::dark_green);
 
             case Facility::WebServer:
-                return fmt::fg(fmt::color::white);
+                return fmt::fg(dark_mode ? fmt::color::white : fmt::color::black);
 
             case Facility::WebConnection:
                 return fmt::fg(fmt::color::green);
 
             case Facility::WebConnectionDump:
-                return fmt::fg(fmt::color::gold);
+                return fmt::fg(dark_mode ? fmt::color::gold : fmt::color::brown);
         }
         return {};
     }

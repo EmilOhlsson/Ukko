@@ -60,14 +60,17 @@ struct Settings : public Options {
     std::optional<Netatmo> netatmo;
 
 #if defined(LOOPBACK) && LOOPBACK
-    static constexpr std::string_view auth_server{"http://localhost:8080/oauth2/authorize"};
-    static constexpr std::string_view token_server{"http://localhost:8080/oauth2/token"};
-    static constexpr std::string_view station_addr{"http://localhost:8080/api/getstationsdata"};
+    static constexpr bool loopback = true;
+    static constexpr std::string_view netatmo_auth_server{"http://localhost:8080/oauth2/authorize"};
+    static constexpr std::string_view netamo_token_server{"http://localhost:8080/oauth2/token"};
+    static constexpr std::string_view netatmo_station_addr{"http://localhost:8080/api/getstationsdata"};
 #else
+    static constexpr bool loopback = false;
     static constexpr std::string_view auth_server{"https://api.netatmo.com/oauth2/authorize"};
     static constexpr std::string_view token_server{"https://api.netatmo.com/oauth2/token"};
     static constexpr std::string_view station_addr{"https://api.netatmo.com/api/getstationsdata"};
 #endif
+    static constexpr std::string_view gcal_auth_server {"http://localhost:8080/oath2/authorize"};
 
     std::optional<Position> position{};
 
