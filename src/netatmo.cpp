@@ -3,9 +3,7 @@
 #include <fmt/core.h>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
-#include <thread>
 #include <unistd.h>
 
 #include "common.hpp"
@@ -82,19 +80,20 @@ std::optional<Weather::MeasuredData> Weather::retrieve() {
         for (const json &module : device["modules"]) {
             std::string module_id = module["_id"].get<std::string>();
             log("Looking at module: {}", module_id);
-            if (module_id == netatmo.modules.outdoor) {
-                json dashboard = module["dashboard_data"];
-                md.outdoor.now = dashboard["Temperature"].get<double>();
-                md.outdoor.min = dashboard["min_temp"].get<double>();
-                md.outdoor.max = dashboard["max_temp"].get<double>();
-                log("Presenting temperature: {}",
-                    module["dashboard_data"]["Temperature"].get<double>());
-            } else if (module_id == netatmo.modules.rain) {
-                json dashboard = module["dashboard_data"];
-                md.rain.last_1h = dashboard["sum_rain_1"].get<double>();
-                md.rain.last_24h = dashboard["sum_rain_24"].get<double>();
-                log("Presenting rain: {}", module["dashboard_data"]["Rain"].get<double>());
-            }
+            // TODO: Need to retrieve settings
+            //if (module_id == netatmo.modules.outdoor) {
+            //    json dashboard = module["dashboard_data"];
+            //    md.outdoor.now = dashboard["Temperature"].get<double>();
+            //    md.outdoor.min = dashboard["min_temp"].get<double>();
+            //    md.outdoor.max = dashboard["max_temp"].get<double>();
+            //    log("Presenting temperature: {}",
+            //        module["dashboard_data"]["Temperature"].get<double>());
+            //} else if (module_id == netatmo.modules.rain) {
+            //    json dashboard = module["dashboard_data"];
+            //    md.rain.last_1h = dashboard["sum_rain_1"].get<double>();
+            //    md.rain.last_24h = dashboard["sum_rain_24"].get<double>();
+            //    log("Presenting rain: {}", module["dashboard_data"]["Rain"].get<double>());
+            //}
         }
 
         return md;
@@ -132,31 +131,35 @@ bool Weather::get_token(const PostParams &params) {
 /**
  * Authenticate against netatmo API
  */
-bool Weather::authenticate(const Auth &auth) {
+auto Weather::authenticate(const Auth &auth) -> bool {
     debug("Authenticating against Netatmo using code=\"{}\", redirect=\"{}\"", auth.code,
           auth.redirect);
-    return get_token(PostParams{
-        {"grant_type", "authorization_code"},
-        {"client_id", settings.netatmo.client_id},
-        {"client_secret", settings.netatmo.client_secret},
-        {"redirect_uri", auth.redirect},
-        {"code", auth.code},
-        {"scope", "read_station"},
-    });
+    return false;
+    // TODO: re-enable
+    //return get_token(PostParams{
+    //    {"grant_type", "authorization_code"},
+    //    {"client_id", settings.netatmo.client_id},
+    //    {"client_secret", settings.netatmo.client_secret},
+    //    {"redirect_uri", auth.redirect},
+    //    {"code", auth.code},
+    //    {"scope", "read_station"},
+    //});
 }
 
 /**
  * Refresh the authentication token
  */
-bool Weather::refresh_authentication() {
+auto Weather::refresh_authentication() -> bool{
     debug("Refreshing Netatmo authentication");
-    return get_token(PostParams{
-        {"grant_type", "refresh_token"},
-        {"client_id", settings.netatmo.client_id},
-        {"client_secret", settings.netatmo.client_secret},
-        {"refresh_token", refresh_token},
-        {"scope", "read_station"},
-    });
+    return false;
+    // TODO: re-enable
+    //return get_token(PostParams{
+    //    {"grant_type", "refresh_token"},
+    //    {"client_id", settings.netatmo.client_id},
+    //    {"client_secret", settings.netatmo.client_secret},
+    //    {"refresh_token", refresh_token},
+    //    {"scope", "read_station"},
+    //});
 }
 
 bool Weather::process_authentication_result(json auth) {
@@ -191,7 +194,7 @@ std::optional<nlohmann::json> Weather::fetch_device_data() {
 
     Curl curl{settings};
     Url url{std::string{settings.station_addr}};
-    url.add_param({"device_id", settings.netatmo.device_id});
+    url.add_param({"device_id", std::string{"device_id"} /* TODO: settings.netatmo.device_id */});
     auto [success, response] =
         curl.get(url, HeaderParams{
                           {"Accept", "application/json"},

@@ -10,7 +10,7 @@
 
 // TODO: There is basically no error handling going on here, that should be fixed
 
-struct Weather {
+struct Weather final {
     using json = nlohmann::json;
 
     Weather(const Settings &settings);
@@ -85,7 +85,7 @@ struct Weather {
     const Settings &settings;
     const Logger log = settings.get_logger(Logger::Facility::Weather, true);
     const Logger debug = settings.get_logger(Logger::Facility::Weather, true);
-    const Settings::Netatmo &netatmo = settings.netatmo;
+    // const Settings::Netatmo &netatmo = settings.netatmo;
 
     /* Used for handling dummy data */
     std::optional<std::string> load_file{};

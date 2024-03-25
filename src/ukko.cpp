@@ -129,10 +129,11 @@ int main(int argc, char **argv) {
         }
     }
 
-    if (access(options_used.settings_file.c_str(), R_OK) != 0) {
-        fmt::print("Missing settings file {}\n", options_used.settings_file);
-        return -1;
-    }
+    // TODO: are we still using the lua file?
+    //if (access(options_used.settings_file.c_str(), R_OK) != 0) {
+    //    fmt::print("Missing settings file {}\n", options_used.settings_file);
+    //    return -1;
+    //}
 
     Settings settings{options_used};
     Ukko ukko{std::move(settings)};

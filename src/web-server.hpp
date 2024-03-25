@@ -377,8 +377,9 @@ struct WebServer final {
                     });
                 }
                 /* Note: We are just randomizing state, but we do not track it */
+                // TODO: Re-enable once this works
                 std::string page{
-                    fmt::format(index, fmt::arg("client_id", settings.netatmo.client_id),
+                    fmt::format(index, fmt::arg("client_id", "client_id" /* TODO: settings.netatmo.client_id */),
                                 fmt::arg("auth_server", settings.auth_server),
                                 fmt::arg("state", fmt::format("{:x}", rand(generator))),
                                 fmt::arg("redirect_addr", *hostname))};

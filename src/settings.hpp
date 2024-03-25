@@ -21,29 +21,31 @@ extern "C" {
  * the lua script obsolete */
 struct Settings : public Options {
     Settings(const Options &options) : Options{options} {
+        // TODO: Actually read settings
+        return ;
         // TODO: Need to create some form of empty configuration state
-        LuaFile file(settings_file);
+        //LuaFile file(settings_file);
 
-        LuaTable netatmo_config = file.get_table("netatmo");
-        netatmo.client_id = netatmo_config.get_string_field("client_id");
-        netatmo.client_secret = netatmo_config.get_string_field("client_secret");
-        netatmo.device_id = netatmo_config.get_string_field("device_id");
+        //LuaTable netatmo_config = file.get_table("netatmo");
+        //netatmo.client_id = netatmo_config.get_string_field("client_id");
+        //netatmo.client_secret = netatmo_config.get_string_field("client_secret");
+        //netatmo.device_id = netatmo_config.get_string_field("device_id");
 
-        LuaTable modules = netatmo_config.get_table_field("modules");
-        netatmo.modules.outdoor = modules.get_string_field("outdoor");
-        netatmo.modules.rain = modules.get_string_field("rain");
+        //LuaTable modules = netatmo_config.get_table_field("modules");
+        //netatmo.modules.outdoor = modules.get_string_field("outdoor");
+        //netatmo.modules.rain = modules.get_string_field("rain");
 
-        try {
-            LuaTable position_table = file.get_table("position");
-            std::string longitude = position_table.get_string_field("longitude");
-            std::string latitude = position_table.get_string_field("latitude");
-            position = Position{
-                .longitude = longitude,
-                .latitude = latitude,
-            };
-        } catch (const std::runtime_error &err) {
-            fmt::print("No (valid) position provided, will use netatmo position\n");
-        }
+        //try {
+        //    LuaTable position_table = file.get_table("position");
+        //    std::string longitude = position_table.get_string_field("longitude");
+        //    std::string latitude = position_table.get_string_field("latitude");
+        //    position = Position{
+        //        .longitude = longitude,
+        //        .latitude = latitude,
+        //    };
+        //} catch (const std::runtime_error &err) {
+        //    fmt::print("No (valid) position provided, will use netatmo position\n");
+        //}
     }
 
     struct Netatmo {
@@ -54,7 +56,8 @@ struct Settings : public Options {
             std::string outdoor;
             std::string rain;
         } modules;
-    } netatmo;
+    };
+    std::optional<Netatmo> netatmo;
 
 #if defined(LOOPBACK) && LOOPBACK
     static constexpr std::string_view auth_server{"http://localhost:8080/oauth2/authorize"};

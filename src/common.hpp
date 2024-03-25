@@ -59,6 +59,7 @@ struct Logger {
     bool enabled{};
 
     fmt::text_style get_style() const {
+        // TODO should perhaps check background color using `getenv("BACKGROUND")`
         switch (facility) {
             case Facility::Curl:
                 return fmt::fg(fmt::color::coral);
